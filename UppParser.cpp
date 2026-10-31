@@ -168,8 +168,8 @@ bool UppParser::Parse(const std::string& upp_path, UppPackage& out_pkg) {
     out_pkg.name = GetFileTitle(upp_path);
 
     std::string line;
-    enum Section { SEC_NONE, SEC_USES, SEC_FILE, SEC_MAINCONFIG, SEC_INCLUDE, SEC_LIBRARY, SEC_LINK };
-    Section current_sec = SEC_NONE;
+    enum class UppSection { None, Uses, File, MainConfig, Include, Library, Link };
+    UppSection current_sec = UppSection::None;
     std::string current_condition = "";
 
     while (std::getline(is, line)) {
@@ -186,7 +186,7 @@ bool UppParser::Parse(const std::string& upp_path, UppPackage& out_pkg) {
             if (q1 != std::string::npos && q2 != std::string::npos && q2 > q1) {
                 out_pkg.description = trimmed.substr(q1 + 1, q2 - q1 - 1);
             }
-            current_sec = SEC_NONE;
+            current_sec = UppSection::None;
             continue;
         }
 
@@ -196,17 +196,17 @@ bool UppParser::Parse(const std::string& upp_path, UppPackage& out_pkg) {
             if (q1 != std::string::npos && q2 != std::string::npos && q2 > q1) {
                 out_pkg.target = trimmed.substr(q1 + 1, q2 - q1 - 1);
             }
-            current_sec = SEC_NONE;
+            current_sec = UppSection::None;
             continue;
         }
 
         if (StartsWith(trimmed, "mainconfig")) {
-            current_sec = SEC_MAINCONFIG;
+            current_sec = UppSection::MainConfig;
             continue;
         }
 
         if (StartsWith(trimmed, "uses")) {
-            current_sec = SEC_USES;
+            current_sec = UppSection::Uses;
             current_condition = "";
             std::string rest = Trim(trimmed.substr(4));
             if (!rest.empty() && rest[0] == '(') {
@@ -226,57 +226,57 @@ bool UppParser::Parse(const std::string& upp_path, UppPackage& out_pkg) {
                 } else {
                     out_pkg.conditional_uses.push_back({current_condition, pkgs});
                 }
-                if (finished) current_sec = SEC_NONE;
+                if (finished) current_sec = UppSection::None;
             }
             continue;
         }
 
         if (StartsWith(trimmed, "file")) {
-            current_sec = SEC_FILE;
+            current_sec = UppSection::File;
             std::string rest = Trim(trimmed.substr(4));
             if (!rest.empty()) {
                 bool finished = false;
                 ParseCommaTokens(rest, out_pkg.files, finished);
-                if (finished) current_sec = SEC_NONE;
+                if (finished) current_sec = UppSection::None;
             }
             continue;
         }
 
         if (StartsWith(trimmed, "include")) {
-            current_sec = SEC_INCLUDE;
+            current_sec = UppSection::Include;
             std::string rest = Trim(trimmed.substr(7));
             if (!rest.empty()) {
                 bool finished = false;
                 ParseCommaTokens(rest, out_pkg.includes, finished);
-                if (finished) current_sec = SEC_NONE;
+                if (finished) current_sec = UppSection::None;
             }
             continue;
         }
 
         if (StartsWith(trimmed, "library")) {
-            current_sec = SEC_LIBRARY;
+            current_sec = UppSection::Library;
             std::string rest = Trim(trimmed.substr(7));
             if (!rest.empty()) {
                 bool finished = false;
                 ParseCommaTokens(rest, out_pkg.libraries, finished);
-                if (finished) current_sec = SEC_NONE;
+                if (finished) current_sec = UppSection::None;
             }
             continue;
         }
 
         if (StartsWith(trimmed, "link")) {
-            current_sec = SEC_LINK;
+            current_sec = UppSection::Link;
             std::string rest = Trim(trimmed.substr(4));
             if (!rest.empty()) {
                 bool finished = false;
                 ParseCommaTokens(rest, out_pkg.links, finished);
-                if (finished) current_sec = SEC_NONE;
+                if (finished) current_sec = UppSection::None;
             }
             continue;
         }
 
         // Section body parsing
-        if (current_sec == SEC_MAINCONFIG) {
+        if (current_sec == UppSection::MainConfig) {
             size_t eq = trimmed.find('=');
             if (eq != std::string::npos) {
                 std::string k_str = Trim(trimmed.substr(0, eq));
@@ -289,11 +289,11 @@ bool UppParser::Parse(const std::string& upp_path, UppPackage& out_pkg) {
                 std::string flags = (v1 != std::string::npos && v2 != std::string::npos && v2 > v1) ? v_str.substr(v1 + 1, v2 - v1 - 1) : "";
                 out_pkg.mainconfigs.push_back({name, flags});
             }
-            if (trimmed.find(';') != std::string::npos) current_sec = SEC_NONE;
+            if (trimmed.find(';') != std::string::npos) current_sec = UppSection::None;
             continue;
         }
 
-        if (current_sec == SEC_USES) {
+        if (current_sec == UppSection::Uses) {
             bool finished = false;
             std::vector<std::string> pkgs;
             ParseCommaTokens(trimmed, pkgs, finished);
@@ -302,35 +302,35 @@ bool UppParser::Parse(const std::string& upp_path, UppPackage& out_pkg) {
             } else {
                 out_pkg.conditional_uses.push_back({current_condition, pkgs});
             }
-            if (finished) current_sec = SEC_NONE;
+            if (finished) current_sec = UppSection::None;
             continue;
         }
 
-        if (current_sec == SEC_FILE) {
+        if (current_sec == UppSection::File) {
             bool finished = false;
             ParseCommaTokens(trimmed, out_pkg.files, finished);
-            if (finished) current_sec = SEC_NONE;
+            if (finished) current_sec = UppSection::None;
             continue;
         }
 
-        if (current_sec == SEC_INCLUDE) {
+        if (current_sec == UppSection::Include) {
             bool finished = false;
             ParseCommaTokens(trimmed, out_pkg.includes, finished);
-            if (finished) current_sec = SEC_NONE;
+            if (finished) current_sec = UppSection::None;
             continue;
         }
 
-        if (current_sec == SEC_LIBRARY) {
+        if (current_sec == UppSection::Library) {
             bool finished = false;
             ParseCommaTokens(trimmed, out_pkg.libraries, finished);
-            if (finished) current_sec = SEC_NONE;
+            if (finished) current_sec = UppSection::None;
             continue;
         }
 
-        if (current_sec == SEC_LINK) {
+        if (current_sec == UppSection::Link) {
             bool finished = false;
             ParseCommaTokens(trimmed, out_pkg.links, finished);
-            if (finished) current_sec = SEC_NONE;
+            if (finished) current_sec = UppSection::None;
             continue;
         }
     }

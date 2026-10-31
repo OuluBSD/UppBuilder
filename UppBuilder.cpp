@@ -234,13 +234,21 @@ int RunCommand(const std::string& cmd) {
 
 std::string CaptureCommand(const std::string& cmd) {
     std::string result;
+#ifdef _WIN32
+    FILE* fp = _popen(cmd.c_str(), "r");
+#else
     FILE* fp = popen(cmd.c_str(), "r");
+#endif
     if (!fp) return "";
     char buf[512];
     while (fgets(buf, sizeof(buf), fp)) {
         result += buf;
     }
+#ifdef _WIN32
+    _pclose(fp);
+#else
     pclose(fp);
+#endif
     return result;
 }
 
