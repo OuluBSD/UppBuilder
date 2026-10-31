@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "description": "3-Pillar Bridge package redirection rules for modular subpackages",
+  "redirects": {
+    "uppsrc/CtrlCore": "uppsrc/Ctrl/Core",
+    "uppsrc/CtrlLib": "uppsrc/Ctrl/Lib",
+    "CtrlCore": "Ctrl/Core",
+    "CtrlLib": "Ctrl/Lib",
+    "Draw": "Draw"
+  }
+}

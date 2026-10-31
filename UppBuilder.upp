@@ -1,0 +1,23 @@
+description "Advanced U++ meta-builder with 3-Pillar Bridge and dependency analyzer\n";
+
+uses
+	Core;
+
+file
+	UppBuilder.h,
+	Bridge.h,
+	Bridge.cpp,
+	UppParser.h,
+	UppParser.cpp,
+	DepGraph.h,
+	DepGraph.cpp,
+	HeaderScanner.h,
+	HeaderScanner.cpp,
+	UmkDriver.h,
+	UmkDriver.cpp,
+	RuntimeDeps.h,
+	RuntimeDeps.cpp,
+	main.cpp;
+
+mainconfig
+	"" = "";

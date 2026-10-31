@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "description": "3-Pillar Bridge file overlays for platform enhancements and upstream compatibility",
+  "overlays": [
+    {
+      "target": "uppsrc/Core/config.h",
+      "overlay": "overlay/Core/config.h",
+      "platforms": ["all"]
+    }
+  ]
+}

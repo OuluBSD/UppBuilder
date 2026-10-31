@@ -1,0 +1,74 @@
+name: UppBuilder CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test-posix:
+    name: Build (${{ matrix.os }} - ${{ matrix.compiler }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            compiler: g++
+          - os: ubuntu-latest
+            compiler: clang++
+          - os: macos-latest
+            compiler: clang++
+
+    steps:
+      - name: Checkout UppBuilder
+        uses: actions/checkout@v4
+
+      - name: Compile with bootstrap.sh (${{ matrix.compiler }})
+        env:
+          CXX: ${{ matrix.compiler }}
+        run: |
+          chmod +x ./bootstrap.sh
+          ./bootstrap.sh
+
+      - name: Verify CLI Output
+        run: |
+          ./uppbuilder --version
+          ./uppbuilder --help
+
+      - name: Test CMake Build
+        run: |
+          mkdir -p build && cd build
+          cmake ..
+          cmake --build . --config Release
+
+  test-windows:
+    name: Build (windows-latest - MSVC)
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout UppBuilder
+        uses: actions/checkout@v4
+
+      - name: Setup MSVC Developer Command Prompt
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Compile with bootstrap.bat
+        shell: cmd
+        run: |
+          call bootstrap.bat
+
+      - name: Verify CLI Output
+        shell: cmd
+        run: |
+          uppbuilder.exe --version
+          uppbuilder.exe --help
+
+      - name: Test CMake Build
+        shell: cmd
+        run: |
+          mkdir build
+          cd build
+          cmake ..
+          cmake --build . --config Release

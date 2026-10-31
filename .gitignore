@@ -1,0 +1,21 @@
+# Build artifacts
+uppbuilder
+uppbuilder.exe
+*.o
+*.obj
+*.pdb
+*.ilk
+*.idb
+
+# Directories
+build/
+bin/
+out/
+.uppbuilder/
+.theide/
+
+# System / IDE
+.DS_Store
+Thumbs.db
+*.swp
+*.bak

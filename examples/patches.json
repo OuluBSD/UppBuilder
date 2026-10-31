@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "description": "3-Pillar Bridge surgical patches applied to virtual staged workspace",
+  "patches": [
+    {
+      "patch": "patches/0001-multi-root-upphub.patch",
+      "target": "",
+      "description": "Adds multi-root nest registry support to UppHub"
+    }
+  ]
+}
