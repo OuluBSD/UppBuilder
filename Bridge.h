@@ -17,9 +17,23 @@ struct PatchEntry {
     std::string description;
 };
 
+struct RestructureRule {
+    std::string upstream_pkg;    // e.g. "CtrlCore"
+    std::string staged_rel_path; // e.g. "Ctrl/Core"
+    std::string staged_upp_name; // e.g. "Core.upp"
+    std::string patch_file;      // e.g. "CtrlCore.patch"
+};
+
 class BridgeEngine {
 public:
     BridgeEngine();
+
+    // Package Restructuring (e.g. CtrlCore -> Ctrl/Core, CtrlLib -> Ctrl/Lib)
+    void AddRestructureRule(const std::string& upstream_pkg,
+                            const std::string& staged_rel_path,
+                            const std::string& staged_upp_name = "",
+                            const std::string& patch_file = "");
+    const std::vector<RestructureRule>& GetRestructureRules() const { return restructure_rules_; }
 
     // Pillar 1: Package Redirection
     void AddRedirect(const std::string& from, const std::string& to);
@@ -46,7 +60,22 @@ public:
                                   std::vector<std::string>& out_effective_roots,
                                   bool verbose = false);
 
+    // Staged applied-patches directory lifecycle
+    // Populates applied_dir with restructured and patched upstream packages
+    bool MaterializeAppliedPatches(const std::string& upstream_uppsrc,
+                                  const std::string& applied_dir,
+                                  const std::string& patches_dir,
+                                  bool force = false,
+                                  bool verbose = false);
+
+    // Reverse-diff: Diffs applied_dir against pristine upstream and writes clean diffs to patches_dir
+    bool GeneratePatches(const std::string& upstream_uppsrc,
+                         const std::string& applied_dir,
+                         const std::string& patches_dir,
+                         bool verbose = false);
+
 private:
+    std::vector<RestructureRule> restructure_rules_;
     std::map<std::string, std::string> redirects_;
     std::map<std::string, std::string> reverse_redirects_;
     std::vector<OverlayEntry> overlays_;

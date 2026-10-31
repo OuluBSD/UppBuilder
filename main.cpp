@@ -31,6 +31,12 @@ void PrintUsage(const char* prog) {
     std::cout << "  --patch <file>[@<dir>]        Add surgical patch to apply to staged workspace\n";
     std::cout << "  --patches-file <file.json>    Load patch list from JSON file\n";
     std::cout << "  --staging-dir <dir>           Custom staging directory (default: .uppbuilder/staging)\n\n";
+    std::cout << "Applied-Patches & Restructuring Options:\n";
+    std::cout << "  --apply-patches               Materialize applied-patches with restructuring & apply patches\n";
+    std::cout << "  --make-patches                Reverse-diff applied-patches against upstream into patches/\n";
+    std::cout << "  --applied-patches <dir>       Path to applied-patches directory (default: applied-patches)\n";
+    std::cout << "  --upstream <dir>              Path to pristine upstream ultimatepp/uppsrc\n";
+    std::cout << "  --patches-dir <dir>           Path to patches directory (default: patches)\n\n";
     std::cout << "Inspection & Graph Analysis:\n";
     std::cout << "  --list-methods                List available build methods\n";
     std::cout << "  --list-mainconfigs <pkg>      List mainconfigs defined in package\n";
@@ -69,6 +75,11 @@ int main(int argc, char* argv[]) {
     std::string report_headers_file;
 
     std::string staging_dir = ".uppbuilder/staging";
+    std::string applied_patches_dir = "applied-patches";
+    std::string patches_dir = "patches";
+    std::string upstream_dir;
+    bool apply_patches_cmd = false;
+    bool make_patches_cmd = false;
     std::string custom_umk;
     std::vector<std::string> extra_roots;
 
@@ -108,6 +119,16 @@ int main(int argc, char* argv[]) {
             custom_umk = argv[++i];
         } else if (arg == "--staging-dir" && i + 1 < argc) {
             staging_dir = argv[++i];
+        } else if (arg == "--applied-patches" && i + 1 < argc) {
+            applied_patches_dir = argv[++i];
+        } else if (arg == "--patches-dir" && i + 1 < argc) {
+            patches_dir = argv[++i];
+        } else if (arg == "--upstream" && i + 1 < argc) {
+            upstream_dir = argv[++i];
+        } else if (arg == "--apply-patches") {
+            apply_patches_cmd = true;
+        } else if (arg == "--make-patches") {
+            make_patches_cmd = true;
         } else if (arg == "--redirect" && i + 1 < argc) {
             std::string mapping = argv[++i];
             size_t eq = mapping.find('=');
@@ -166,12 +187,62 @@ int main(int argc, char* argv[]) {
         repo_root = GetParentDir(cwd);
     }
 
-    std::vector<std::string> assembly_roots = {
-        JoinPath(repo_root, "uppsrc"),
-        JoinPath(repo_root, "upptst"),
-        JoinPath(repo_root, "src"),
-        repo_root
-    };
+    if (upstream_dir.empty()) {
+        std::vector<std::string> candidates = {
+            JoinPath(GetParentDir(repo_root), "ultimatepp/uppsrc"),
+            JoinPath(repo_root, "../ultimatepp/uppsrc"),
+            "/home/sblo/Dev/ultimatepp/uppsrc",
+            GetEnvValue("UPP_UPSTREAM")
+        };
+        for (const auto& c : candidates) {
+            if (!c.empty() && DirectoryExists(c)) {
+                upstream_dir = c;
+                break;
+            }
+        }
+    }
+
+    std::string full_applied = (StartsWith(applied_patches_dir, "/") || (applied_patches_dir.size() >= 2 && applied_patches_dir[1] == ':')) ?
+                               applied_patches_dir : JoinPath(repo_root, applied_patches_dir);
+    std::string full_patches = (StartsWith(patches_dir, "/") || (patches_dir.size() >= 2 && patches_dir[1] == ':')) ?
+                               patches_dir : JoinPath(repo_root, patches_dir);
+
+    // Handle --make-patches command
+    if (make_patches_cmd) {
+        if (upstream_dir.empty() || !DirectoryExists(upstream_dir)) {
+            std::cerr << "Error: Upstream ultimatepp/uppsrc directory not found. Specify with --upstream <path>\n";
+            return 1;
+        }
+        if (!bridge.GeneratePatches(upstream_dir, full_applied, full_patches, verbose)) {
+            return 1;
+        }
+        return 0;
+    }
+
+    // Handle --apply-patches command
+    if (apply_patches_cmd) {
+        if (upstream_dir.empty() || !DirectoryExists(upstream_dir)) {
+            std::cerr << "Error: Upstream ultimatepp/uppsrc directory not found. Specify with --upstream <path>\n";
+            return 1;
+        }
+        if (!bridge.MaterializeAppliedPatches(upstream_dir, full_applied, full_patches, true, verbose)) {
+            return 1;
+        }
+        if (target_pkg.empty()) return 0;
+    }
+
+    std::vector<std::string> assembly_roots;
+    if (DirectoryExists(full_applied)) {
+        // Prepend applied-patches as the primary assembly
+        assembly_roots.push_back(full_applied);
+    }
+    assembly_roots.push_back(JoinPath(repo_root, "uppsrc"));
+    assembly_roots.push_back(JoinPath(repo_root, "upptst"));
+    assembly_roots.push_back(JoinPath(repo_root, "src"));
+    assembly_roots.push_back(repo_root);
+    if (!upstream_dir.empty() && DirectoryExists(upstream_dir)) {
+        assembly_roots.push_back(upstream_dir);
+    }
     for (const auto& er : extra_roots) assembly_roots.push_back(er);
 
     UmkDriver umk_driver;

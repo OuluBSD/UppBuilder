@@ -77,6 +77,8 @@ void Walk(const std::string& path, std::vector<std::string>& files, const std::s
 std::string ReadTextFile(const std::string& path);
 bool WriteTextFile(const std::string& path, const std::string& content);
 bool CopyFile(const std::string& src, const std::string& dst);
+bool CopyDirectoryRecursive(const std::string& src, const std::string& dst);
+bool RemoveDirectoryRecursive(const std::string& path);
 int RunCommand(const std::string& cmd);
 std::string CaptureCommand(const std::string& cmd);
 

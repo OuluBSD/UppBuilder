@@ -228,6 +228,42 @@ bool CopyFile(const std::string& src, const std::string& dst) {
     return true;
 }
 
+bool CopyDirectoryRecursive(const std::string& src, const std::string& dst) {
+    if (!DirectoryExists(src)) return false;
+    RealizeDirectory(dst);
+    for (const auto& item : ListDir(src)) {
+        std::string s = JoinPath(src, item);
+        std::string d = JoinPath(dst, item);
+        if (DirectoryExists(s)) {
+            if (!CopyDirectoryRecursive(s, d)) return false;
+        } else {
+            if (!CopyFile(s, d)) return false;
+        }
+    }
+    return true;
+}
+
+bool RemoveDirectoryRecursive(const std::string& path) {
+    if (!DirectoryExists(path)) return true;
+    for (const auto& item : ListDir(path)) {
+        std::string full = JoinPath(path, item);
+        if (DirectoryExists(full)) {
+            RemoveDirectoryRecursive(full);
+        } else {
+#ifdef _WIN32
+            DeleteFileA(full.c_str());
+#else
+            unlink(full.c_str());
+#endif
+        }
+    }
+#ifdef _WIN32
+    return RemoveDirectoryA(path.c_str()) != 0;
+#else
+    return rmdir(path.c_str()) == 0;
+#endif
+}
+
 int RunCommand(const std::string& cmd) {
     return std::system(cmd.c_str());
 }
