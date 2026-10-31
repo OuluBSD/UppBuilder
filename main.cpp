@@ -119,7 +119,7 @@ int main(int argc, char* argv[]) {
             custom_umk = argv[++i];
         } else if (arg == "--staging-dir" && i + 1 < argc) {
             staging_dir = argv[++i];
-        } else if (arg == "--applied-patches" && i + 1 < argc) {
+        } else if ((arg == "--applied-patches" || arg == "--patched-dir") && i + 1 < argc) {
             applied_patches_dir = argv[++i];
         } else if (arg == "--patches-dir" && i + 1 < argc) {
             patches_dir = argv[++i];
@@ -187,33 +187,18 @@ int main(int argc, char* argv[]) {
         repo_root = GetParentDir(cwd);
     }
 
-    if (upstream_dir.empty()) {
-        std::vector<std::string> candidates = {
-            JoinPath(GetParentDir(repo_root), "ultimatepp/uppsrc"),
-            JoinPath(repo_root, "../ultimatepp/uppsrc"),
-            "/home/sblo/Dev/ultimatepp/uppsrc",
-            GetEnvValue("UPP_UPSTREAM")
-        };
-        for (const auto& c : candidates) {
-            if (!c.empty() && DirectoryExists(c)) {
-                upstream_dir = c;
-                break;
-            }
-        }
-    }
-
-    std::string full_applied = (StartsWith(applied_patches_dir, "/") || (applied_patches_dir.size() >= 2 && applied_patches_dir[1] == ':')) ?
-                               applied_patches_dir : JoinPath(repo_root, applied_patches_dir);
+    std::string upstream_dir_resolved = ResolveUpstreamPath(upstream_dir, repo_root);
+    std::string full_applied = ResolvePatchedUppsrcPath(applied_patches_dir, repo_root);
     std::string full_patches = (StartsWith(patches_dir, "/") || (patches_dir.size() >= 2 && patches_dir[1] == ':')) ?
                                patches_dir : JoinPath(repo_root, patches_dir);
 
     // Handle --make-patches command
     if (make_patches_cmd) {
-        if (upstream_dir.empty() || !DirectoryExists(upstream_dir)) {
+        if (upstream_dir_resolved.empty() || !DirectoryExists(upstream_dir_resolved)) {
             std::cerr << "Error: Upstream ultimatepp/uppsrc directory not found. Specify with --upstream <path>\n";
             return 1;
         }
-        if (!bridge.GeneratePatches(upstream_dir, full_applied, full_patches, verbose)) {
+        if (!bridge.GeneratePatches(upstream_dir_resolved, full_applied, full_patches, verbose)) {
             return 1;
         }
         return 0;
@@ -221,28 +206,32 @@ int main(int argc, char* argv[]) {
 
     // Handle --apply-patches command
     if (apply_patches_cmd) {
-        if (upstream_dir.empty() || !DirectoryExists(upstream_dir)) {
+        if (upstream_dir_resolved.empty() || !DirectoryExists(upstream_dir_resolved)) {
             std::cerr << "Error: Upstream ultimatepp/uppsrc directory not found. Specify with --upstream <path>\n";
             return 1;
         }
-        if (!bridge.MaterializeAppliedPatches(upstream_dir, full_applied, full_patches, true, verbose)) {
+        if (!bridge.MaterializeAppliedPatches(upstream_dir_resolved, full_applied, full_patches, true, verbose)) {
             return 1;
         }
         if (target_pkg.empty()) return 0;
     }
 
+    // Auto-materialize patched-uppsrc if missing and upstream is available
+    if (!DirectoryExists(full_applied) && !upstream_dir_resolved.empty()) {
+        if (verbose) std::cout << "Notice: patched assembly not found at " << full_applied << ". Materializing...\n";
+        bridge.MaterializeAppliedPatches(upstream_dir_resolved, full_applied, full_patches, false, verbose);
+    }
+
+    // Assemble roots for umk: ONLY patched-uppsrc and repository roots.
+    // Upstream is never passed to umk to avoid dual-Core and unpatched CtrlCore shadowing.
     std::vector<std::string> assembly_roots;
     if (DirectoryExists(full_applied)) {
-        // Prepend applied-patches as the primary assembly
         assembly_roots.push_back(full_applied);
     }
     assembly_roots.push_back(JoinPath(repo_root, "uppsrc"));
     assembly_roots.push_back(JoinPath(repo_root, "upptst"));
     assembly_roots.push_back(JoinPath(repo_root, "src"));
     assembly_roots.push_back(repo_root);
-    if (!upstream_dir.empty() && DirectoryExists(upstream_dir)) {
-        assembly_roots.push_back(upstream_dir);
-    }
     for (const auto& er : extra_roots) assembly_roots.push_back(er);
 
     UmkDriver umk_driver;

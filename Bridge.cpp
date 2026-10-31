@@ -252,6 +252,90 @@ bool BridgeEngine::MaterializeStagedAssembly(const std::string& repo_root,
     return true;
 }
 
+bool BridgeEngine::CreateCompatibilityShims(const std::string& target_uppsrc, bool verbose) {
+    // 1. CtrlCore shim
+    std::string cc_dir = JoinPath(target_uppsrc, "CtrlCore");
+    RealizeDirectory(cc_dir);
+    std::string cc_upp = "description \"Compatibility forwarding shim to Ctrl/Core\\377\";\n\nuses\n\tCtrl/Core;\n\nfile\n\tCtrlCore.h;\n";
+    WriteTextFile(JoinPath(cc_dir, "CtrlCore.upp"), cc_upp);
+    std::string cc_h = "#ifndef _CtrlCore_CtrlCore_h_\n#define _CtrlCore_CtrlCore_h_\n\n// Forwarding shim to restructured Ctrl/Core\n#include <Ctrl/Core/CtrlCore.h>\n\n#endif\n";
+    WriteTextFile(JoinPath(cc_dir, "CtrlCore.h"), cc_h);
+
+    // 2. CtrlLib shim
+    std::string cl_dir = JoinPath(target_uppsrc, "CtrlLib");
+    RealizeDirectory(cl_dir);
+    std::string cl_upp = "description \"Compatibility forwarding shim to Ctrl/Lib\\377\";\n\nuses\n\tCtrl/Lib;\n\nfile\n\tCtrlLib.h;\n";
+    WriteTextFile(JoinPath(cl_dir, "CtrlLib.upp"), cl_upp);
+    std::string cl_h = "#ifndef _CtrlLib_CtrlLib_h_\n#define _CtrlLib_CtrlLib_h_\n\n// Forwarding shim to restructured Ctrl/Lib\n#include <Ctrl/Lib/CtrlLib.h>\n\n#endif\n";
+    WriteTextFile(JoinPath(cl_dir, "CtrlLib.h"), cl_h);
+
+    if (verbose) {
+        std::cout << "Created compatibility shims for CtrlCore and CtrlLib in " << target_uppsrc << "\n";
+    }
+    return true;
+}
+
+bool BridgeEngine::RewriteManifestsAndIncludes(const std::string& target_uppsrc, bool verbose) {
+    if (!DirectoryExists(target_uppsrc)) return false;
+
+    std::vector<std::string> all_files;
+    Walk(target_uppsrc, all_files);
+
+    int rewritten_upp = 0;
+    int rewritten_src = 0;
+
+    for (const auto& f : all_files) {
+        std::string norm_f = NormalizePath(f);
+        // Do not touch compatibility shims
+        if (norm_f.find("/CtrlCore/CtrlCore.upp") != std::string::npos ||
+            norm_f.find("/CtrlCore/CtrlCore.h") != std::string::npos ||
+            norm_f.find("/CtrlLib/CtrlLib.upp") != std::string::npos ||
+            norm_f.find("/CtrlLib/CtrlLib.h") != std::string::npos) {
+            continue;
+        }
+
+        if (EndsWith(f, ".upp")) {
+            std::string content = ReadTextFile(f);
+            if (content.empty()) continue;
+
+            std::string updated = ReplaceWholeWord(content, "CtrlCore", "Ctrl/Core");
+            updated = ReplaceWholeWord(updated, "CtrlLib", "Ctrl/Lib");
+
+            if (updated != content) {
+                WriteTextFile(f, updated);
+                rewritten_upp++;
+            }
+        } else if (EndsWith(f, ".h") || EndsWith(f, ".hpp") || EndsWith(f, ".cpp") || EndsWith(f, ".mm") || EndsWith(f, ".inl") || EndsWith(f, ".i")) {
+            std::string content = ReadTextFile(f);
+            if (content.empty()) continue;
+
+            bool modified = false;
+            std::string updated = content;
+
+            if (updated.find("CtrlCore/") != std::string::npos) {
+                updated = Replace(updated, "<CtrlCore/", "<Ctrl/Core/");
+                updated = Replace(updated, "\"CtrlCore/", "\"Ctrl/Core/");
+                modified = true;
+            }
+            if (updated.find("CtrlLib/") != std::string::npos) {
+                updated = Replace(updated, "<CtrlLib/", "<Ctrl/Lib/");
+                updated = Replace(updated, "\"CtrlLib/", "\"Ctrl/Lib/");
+                modified = true;
+            }
+
+            if (modified && updated != content) {
+                WriteTextFile(f, updated);
+                rewritten_src++;
+            }
+        }
+    }
+
+    if (verbose) {
+        std::cout << "Rewrote " << rewritten_upp << " package manifests and " << rewritten_src << " source files to use Ctrl/Core and Ctrl/Lib\n";
+    }
+    return true;
+}
+
 bool BridgeEngine::MaterializeAppliedPatches(const std::string& upstream_uppsrc,
                                              const std::string& applied_dir,
                                              const std::string& patches_dir,
@@ -263,32 +347,36 @@ bool BridgeEngine::MaterializeAppliedPatches(const std::string& upstream_uppsrc,
     }
 
     if (verbose) {
-        std::cout << "==> UppBuilder: Staging applied-patches workspace in " << applied_dir << "\n";
+        std::cout << "==> UppBuilder: Staging patched-uppsrc assembly in " << applied_dir << "\n";
     }
     RealizeDirectory(applied_dir);
 
-    // 1. Process Restructure Rules (CtrlCore -> Ctrl/Core, CtrlLib -> Ctrl/Lib)
+    // 1. Full copy of upstream packages if not yet staged or force requested
+    for (const auto& item : ListDir(upstream_uppsrc)) {
+        std::string src_item = JoinPath(upstream_uppsrc, item);
+        std::string dst_item = JoinPath(applied_dir, item);
+        if (DirectoryExists(src_item)) {
+            if (force || !DirectoryExists(dst_item)) {
+                if (DirectoryExists(dst_item)) RemoveDirectoryRecursive(dst_item);
+                CopyDirectoryRecursive(src_item, dst_item);
+            }
+        } else if (FileExists(src_item)) {
+            if (force || !FileExists(dst_item)) {
+                CopyFile(src_item, dst_item);
+            }
+        }
+    }
+
+    // 2. Process Restructure Rules (CtrlCore -> Ctrl/Core, CtrlLib -> Ctrl/Lib)
     for (const auto& rule : restructure_rules_) {
-        std::string src_pkg_dir = JoinPath(upstream_uppsrc, rule.upstream_pkg);
+        std::string orig_in_staged = JoinPath(applied_dir, rule.upstream_pkg);
         std::string dst_pkg_dir = JoinPath(applied_dir, rule.staged_rel_path);
 
-        if (!DirectoryExists(src_pkg_dir)) {
-            if (verbose) std::cerr << "Notice: Upstream package not found: " << src_pkg_dir << "\n";
-            continue;
-        }
-
-        if (force || !DirectoryExists(dst_pkg_dir)) {
-            if (DirectoryExists(dst_pkg_dir)) {
-                RemoveDirectoryRecursive(dst_pkg_dir);
-            }
-            RealizeDirectory(dst_pkg_dir);
-            if (verbose) {
-                std::cout << "Restructuring: " << rule.upstream_pkg << " -> " << rule.staged_rel_path << "\n";
-            }
-            if (!CopyDirectoryRecursive(src_pkg_dir, dst_pkg_dir)) {
-                std::cerr << "Error: Failed to copy " << src_pkg_dir << " to " << dst_pkg_dir << "\n";
-                return false;
-            }
+        if (DirectoryExists(orig_in_staged) && orig_in_staged != dst_pkg_dir) {
+            if (DirectoryExists(dst_pkg_dir)) RemoveDirectoryRecursive(dst_pkg_dir);
+            RealizeDirectory(GetParentDir(dst_pkg_dir));
+            CopyDirectoryRecursive(orig_in_staged, dst_pkg_dir);
+            RemoveDirectoryRecursive(orig_in_staged);
 
             // Ensure proper .upp manifest for subpackage structure
             std::string orig_upp = JoinPath(dst_pkg_dir, rule.upstream_pkg + ".upp");
@@ -297,21 +385,27 @@ bool BridgeEngine::MaterializeAppliedPatches(const std::string& upstream_uppsrc,
                 CopyFile(orig_upp, new_upp);
             }
         }
-
-        // Apply corresponding patch if present
-        std::string patch_path = JoinPath(patches_dir, rule.patch_file);
-        if (FileExists(patch_path)) {
-            if (verbose) std::cout << "Applying patch to " << rule.staged_rel_path << ": " << patch_path << "\n";
-            ApplySinglePatch(patch_path, dst_pkg_dir, 1, verbose);
-        }
     }
 
-    // 2. Process any other top-level package patches in patches_dir (e.g. Core.patch, Draw.patch)
+    // 3. Create compatibility forwarding shims
+    CreateCompatibilityShims(applied_dir, verbose);
+
+    // 4. Rewrite package manifests and includes across all staged packages
+    RewriteManifestsAndIncludes(applied_dir, verbose);
+
+    // 5. Apply surgical patches
     if (DirectoryExists(patches_dir)) {
+        for (const auto& rule : restructure_rules_) {
+            std::string patch_path = JoinPath(patches_dir, rule.patch_file);
+            std::string dst_pkg_dir = JoinPath(applied_dir, rule.staged_rel_path);
+            if (FileExists(patch_path) && DirectoryExists(dst_pkg_dir)) {
+                if (verbose) std::cout << "Applying patch to " << rule.staged_rel_path << ": " << patch_path << "\n";
+                ApplySinglePatch(patch_path, dst_pkg_dir, 1, verbose);
+            }
+        }
+
         for (const auto& item : ListDir(patches_dir)) {
             if (!EndsWith(item, ".patch") && !EndsWith(item, ".diff")) continue;
-
-            // Check if already handled by restructure rules
             bool handled = false;
             for (const auto& r : restructure_rules_) {
                 if (r.patch_file == item) { handled = true; break; }
@@ -319,17 +413,9 @@ bool BridgeEngine::MaterializeAppliedPatches(const std::string& upstream_uppsrc,
             if (handled) continue;
 
             std::string pkg_name = GetFileTitle(item);
-            std::string src_pkg_dir = JoinPath(upstream_uppsrc, pkg_name);
             std::string dst_pkg_dir = JoinPath(applied_dir, pkg_name);
-
-            if (DirectoryExists(src_pkg_dir)) {
-                if (force || !DirectoryExists(dst_pkg_dir)) {
-                    if (DirectoryExists(dst_pkg_dir)) RemoveDirectoryRecursive(dst_pkg_dir);
-                    RealizeDirectory(dst_pkg_dir);
-                    if (verbose) std::cout << "Staging base package for patch: " << pkg_name << "\n";
-                    CopyDirectoryRecursive(src_pkg_dir, dst_pkg_dir);
-                }
-                std::string patch_path = JoinPath(patches_dir, item);
+            std::string patch_path = JoinPath(patches_dir, item);
+            if (DirectoryExists(dst_pkg_dir) && FileExists(patch_path)) {
                 if (verbose) std::cout << "Applying patch to " << pkg_name << ": " << patch_path << "\n";
                 ApplySinglePatch(patch_path, dst_pkg_dir, 1, verbose);
             }

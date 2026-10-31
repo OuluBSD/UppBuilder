@@ -288,4 +288,124 @@ std::string CaptureCommand(const std::string& cmd) {
     return result;
 }
 
+std::string GetUserConfigDir() {
+#ifdef _WIN32
+    std::string appdata = GetEnvValue("APPDATA");
+    if (!appdata.empty()) return JoinPath(appdata, "uppbuilder");
+    return "C:\\uppbuilder";
+#else
+    std::string xdg = GetEnvValue("XDG_CONFIG_HOME");
+    if (!xdg.empty()) return JoinPath(xdg, "uppbuilder");
+    std::string home = GetEnvValue("HOME");
+    return JoinPath(home.empty() ? "/tmp" : home, ".config/uppbuilder");
+#endif
+}
+
+std::string GetUserCacheDir() {
+#ifdef _WIN32
+    std::string local = GetEnvValue("LOCALAPPDATA");
+    if (!local.empty()) return JoinPath(local, "uppbuilder");
+    std::string appdata = GetEnvValue("APPDATA");
+    if (!appdata.empty()) return JoinPath(appdata, "uppbuilder");
+    return "C:\\uppbuilder\\cache";
+#else
+    std::string xdg = GetEnvValue("XDG_CACHE_HOME");
+    if (!xdg.empty()) return JoinPath(xdg, "uppbuilder");
+    std::string home = GetEnvValue("HOME");
+    return JoinPath(home.empty() ? "/tmp" : home, ".cache/uppbuilder");
+#endif
+}
+
+static std::string ExtractJsonValue(const std::string& json, const std::string& key) {
+    std::string needle = "\"" + key + "\"";
+    size_t pos = json.find(needle);
+    if (pos == std::string::npos) return "";
+    pos = json.find(':', pos + needle.size());
+    if (pos == std::string::npos) return "";
+    size_t start = json.find('"', pos);
+    if (start == std::string::npos) return "";
+    size_t end = json.find('"', start + 1);
+    if (end == std::string::npos) return "";
+    return json.substr(start + 1, end - start - 1);
+}
+
+std::string ResolvePatchedUppsrcPath(const std::string& cli_override, const std::string& repo_root) {
+    if (!cli_override.empty()) return NormalizePath(cli_override);
+
+    std::string env = GetEnvValue("UPP_PATCHED_UPPSRC");
+    if (!env.empty()) return NormalizePath(env);
+
+    // Check local repo options
+    std::vector<std::string> local_candidates = {
+        JoinPath(repo_root, "patched-uppsrc"),
+        JoinPath(repo_root, "applied-patches")
+    };
+    for (const auto& c : local_candidates) {
+        if (DirectoryExists(c)) return NormalizePath(c);
+    }
+
+    // Check global config file
+    std::string cfg_file = JoinPath(GetUserConfigDir(), "config.json");
+    if (FileExists(cfg_file)) {
+        std::string json = ReadTextFile(cfg_file);
+        std::string val = ExtractJsonValue(json, "patched_uppsrc");
+        if (val.empty()) val = ExtractJsonValue(json, "applied_patches");
+        if (!val.empty()) return NormalizePath(val);
+    }
+
+    // Default to user cache
+    return NormalizePath(JoinPath(GetUserCacheDir(), "patched-uppsrc"));
+}
+
+std::string ResolveUpstreamPath(const std::string& cli_override, const std::string& repo_root) {
+    if (!cli_override.empty()) return NormalizePath(cli_override);
+
+    std::string env = GetEnvValue("UPP_UPSTREAM");
+    if (!env.empty()) return NormalizePath(env);
+
+    // Check global config file
+    std::string cfg_file = JoinPath(GetUserConfigDir(), "config.json");
+    if (FileExists(cfg_file)) {
+        std::string json = ReadTextFile(cfg_file);
+        std::string val = ExtractJsonValue(json, "upstream");
+        if (!val.empty() && DirectoryExists(val)) return NormalizePath(val);
+    }
+
+    // Auto-detect common candidate paths
+    std::vector<std::string> candidates = {
+        JoinPath(GetParentDir(repo_root), "ultimatepp/uppsrc"),
+        JoinPath(repo_root, "../ultimatepp/uppsrc"),
+        JoinPath(GetEnvValue("HOME"), "Dev/ultimatepp/uppsrc"),
+        "/yhteinen/active/sblo/Dev/ultimatepp/uppsrc",
+        "/home/sblo/Dev/ultimatepp/uppsrc"
+    };
+    for (const auto& c : candidates) {
+        if (!c.empty() && DirectoryExists(c)) {
+            return NormalizePath(c);
+        }
+    }
+    return "";
+}
+
+std::string ReplaceWholeWord(const std::string& str, const std::string& from, const std::string& to) {
+    if (from.empty()) return str;
+    std::string result;
+    size_t last_pos = 0;
+    size_t pos = 0;
+    while ((pos = str.find(from, last_pos)) != std::string::npos) {
+        bool left_ok = (pos == 0) || (!isalnum((unsigned char)str[pos - 1]) && str[pos - 1] != '_' && str[pos - 1] != '/');
+        bool right_ok = (pos + from.size() >= str.size()) || (!isalnum((unsigned char)str[pos + from.size()]) && str[pos + from.size()] != '_' && str[pos + from.size()] != '/');
+        if (left_ok && right_ok) {
+            result.append(str, last_pos, pos - last_pos);
+            result.append(to);
+            last_pos = pos + from.size();
+        } else {
+            result.append(str, last_pos, pos - last_pos + 1);
+            last_pos = pos + 1;
+        }
+    }
+    result.append(str, last_pos, str.size() - last_pos);
+    return result;
+}
+
 } // namespace UppBuilder

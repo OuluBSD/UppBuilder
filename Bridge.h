@@ -68,6 +68,14 @@ public:
                                   bool force = false,
                                   bool verbose = false);
 
+    // Manifest & header dependency rewriter:
+    // Rewrites uses CtrlCore -> Ctrl/Core, uses CtrlLib -> Ctrl/Lib in all .upp files
+    // Rewrites #include <CtrlCore/ -> <Ctrl/Core/, <CtrlLib/ -> <Ctrl/Lib/ in headers and sources
+    bool RewriteManifestsAndIncludes(const std::string& target_uppsrc, bool verbose = false);
+
+    // Creates compatibility forwarding shims for CtrlCore and CtrlLib
+    bool CreateCompatibilityShims(const std::string& target_uppsrc, bool verbose = false);
+
     // Reverse-diff: Diffs applied_dir against pristine upstream and writes clean diffs to patches_dir
     bool GeneratePatches(const std::string& upstream_uppsrc,
                          const std::string& applied_dir,
