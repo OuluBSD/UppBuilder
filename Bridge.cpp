@@ -351,8 +351,34 @@ bool BridgeEngine::MaterializeAppliedPatches(const std::string& upstream_uppsrc,
     }
     RealizeDirectory(applied_dir);
 
-    // 1. Full copy of upstream packages if not yet staged or force requested
+    // 1. Process Restructure Rules directly from upstream:
+    for (const auto& rule : restructure_rules_) {
+        std::string src_upstream = JoinPath(upstream_uppsrc, rule.upstream_pkg);
+        std::string dst_pkg_dir = JoinPath(applied_dir, rule.staged_rel_path);
+        if (DirectoryExists(src_upstream)) {
+            if (force || !DirectoryExists(dst_pkg_dir)) {
+                if (DirectoryExists(dst_pkg_dir)) RemoveDirectoryRecursive(dst_pkg_dir);
+                RealizeDirectory(GetParentDir(dst_pkg_dir));
+                CopyDirectoryRecursive(src_upstream, dst_pkg_dir);
+
+                // Ensure proper .upp manifest for subpackage structure
+                std::string orig_upp = JoinPath(dst_pkg_dir, rule.upstream_pkg + ".upp");
+                std::string new_upp = JoinPath(dst_pkg_dir, rule.staged_upp_name);
+                if (FileExists(orig_upp) && !rule.staged_upp_name.empty() && orig_upp != new_upp) {
+                    CopyFile(orig_upp, new_upp);
+                }
+            }
+        }
+    }
+
+    // 2. Full copy of other upstream packages if not yet staged or force requested
     for (const auto& item : ListDir(upstream_uppsrc)) {
+        bool is_restructured = false;
+        for (const auto& rule : restructure_rules_) {
+            if (rule.upstream_pkg == item) { is_restructured = true; break; }
+        }
+        if (is_restructured) continue;
+
         std::string src_item = JoinPath(upstream_uppsrc, item);
         std::string dst_item = JoinPath(applied_dir, item);
         if (DirectoryExists(src_item)) {
@@ -363,26 +389,6 @@ bool BridgeEngine::MaterializeAppliedPatches(const std::string& upstream_uppsrc,
         } else if (FileExists(src_item)) {
             if (force || !FileExists(dst_item)) {
                 CopyFile(src_item, dst_item);
-            }
-        }
-    }
-
-    // 2. Process Restructure Rules (CtrlCore -> Ctrl/Core, CtrlLib -> Ctrl/Lib)
-    for (const auto& rule : restructure_rules_) {
-        std::string orig_in_staged = JoinPath(applied_dir, rule.upstream_pkg);
-        std::string dst_pkg_dir = JoinPath(applied_dir, rule.staged_rel_path);
-
-        if (DirectoryExists(orig_in_staged) && orig_in_staged != dst_pkg_dir) {
-            if (DirectoryExists(dst_pkg_dir)) RemoveDirectoryRecursive(dst_pkg_dir);
-            RealizeDirectory(GetParentDir(dst_pkg_dir));
-            CopyDirectoryRecursive(orig_in_staged, dst_pkg_dir);
-            RemoveDirectoryRecursive(orig_in_staged);
-
-            // Ensure proper .upp manifest for subpackage structure
-            std::string orig_upp = JoinPath(dst_pkg_dir, rule.upstream_pkg + ".upp");
-            std::string new_upp = JoinPath(dst_pkg_dir, rule.staged_upp_name);
-            if (FileExists(orig_upp) && !rule.staged_upp_name.empty() && orig_upp != new_upp) {
-                CopyFile(orig_upp, new_upp);
             }
         }
     }
@@ -494,10 +500,10 @@ bool BridgeEngine::GeneratePatches(const std::string& upstream_uppsrc,
         std::string staged_dir = JoinPath(applied_dir, item);
         if (!DirectoryExists(staged_dir)) continue;
 
-        // Skip restructured folders like "Ctrl"
+        // Skip restructured folders and compatibility shims
         bool is_restructured = false;
         for (const auto& r : restructure_rules_) {
-            if (StartsWith(r.staged_rel_path, item + "/") || r.staged_rel_path == item) {
+            if (StartsWith(r.staged_rel_path, item + "/") || r.staged_rel_path == item || r.upstream_pkg == item) {
                 is_restructured = true;
                 break;
             }
