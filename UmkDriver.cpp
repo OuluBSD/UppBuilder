@@ -181,9 +181,6 @@ int UmkDriver::ExecuteBuild(const std::string& umk_exe,
 
     if (jobs > 0) ss << " -H" << jobs;
 
-    RealizeDirectory(GetParentDir(output_binary));
-    ss << " \"" << output_binary << "\"";
-
     std::string active_flags = flags;
     if (!release) {
         if (active_flags.find("DEBUG") == std::string::npos) {
@@ -192,6 +189,11 @@ int UmkDriver::ExecuteBuild(const std::string& umk_exe,
     }
     if (!active_flags.empty()) {
         ss << " +" << Replace(active_flags, " ", ",");
+    }
+
+    if (!output_binary.empty()) {
+        RealizeDirectory(GetParentDir(output_binary));
+        ss << " \"" << output_binary << "\"";
     }
 
     if (verbose) {

@@ -341,12 +341,39 @@ int main(int argc, char* argv[]) {
 
     std::string resolved_target = bridge.ResolveRedirect(target_pkg);
 
+    std::string effective_flags;
+    if (!mainconf_pref.empty()) {
+        DependencyGraph graph(bridge, effective_assembly_roots);
+        std::string pkg_upp = graph.FindPackagePath(resolved_target);
+        UppPackage target_info;
+        if (!pkg_upp.empty() && UppParser::Parse(pkg_upp, target_info)) {
+            bool found = false;
+            char* endp = nullptr;
+            long idx = strtol(mainconf_pref.c_str(), &endp, 10);
+            if (*endp == '\0' && idx >= 0 && idx < (long)target_info.mainconfigs.size()) {
+                effective_flags = target_info.mainconfigs[idx].flags;
+                found = true;
+            } else {
+                for (const auto& mc : target_info.mainconfigs) {
+                    if (mc.name == mainconf_pref) {
+                        effective_flags = mc.flags;
+                        found = true;
+                        break;
+                    }
+                }
+            }
+            if (!found) effective_flags = mainconf_pref;
+        } else {
+            effective_flags = mainconf_pref;
+        }
+    }
+
     int res = umk_driver.ExecuteBuild(umk_exe,
                                      effective_assembly_roots,
                                      resolved_target,
                                      method.path,
                                      output_path,
-                                     mainconf_pref,
+                                     effective_flags,
                                      release,
                                      clean,
                                      jobs,
