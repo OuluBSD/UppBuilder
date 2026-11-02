@@ -49,6 +49,76 @@ std::string DependencyGraph::FindPackagePath(const std::string& pkg_name) const 
     return "";
 }
 
+static int LevenshteinDistance(const std::string& s1, const std::string& s2) {
+    const size_t m = s1.size();
+    const size_t n = s2.size();
+    std::vector<std::vector<int>> d(m + 1, std::vector<int>(n + 1));
+    for (size_t i = 0; i <= m; ++i) d[i][0] = (int)i;
+    for (size_t j = 0; j <= n; ++j) d[0][j] = (int)j;
+    for (size_t i = 1; i <= m; ++i) {
+        for (size_t j = 1; j <= n; ++j) {
+            int cost = (std::tolower((unsigned char)s1[i - 1]) == std::tolower((unsigned char)s2[j - 1])) ? 0 : 1;
+            d[i][j] = std::min({ d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + cost });
+        }
+    }
+    return d[m][n];
+}
+
+std::vector<std::string> DependencyGraph::FindCloseMatches(const std::string& pkg_name, int max_matches) const {
+    std::string norm = pkg_name;
+    for (char& c : norm) if (c == '\\') c = '/';
+
+    // Collect candidate packages across search roots
+    std::set<std::string> all_packages;
+    for (const auto& root : search_roots_) {
+        std::vector<std::string> found;
+        Walk(root, found, ".upp");
+        for (const auto& f : found) {
+            std::string abs_f = GetAbsolutePath(f);
+            std::string abs_root = GetAbsolutePath(root);
+            if (abs_f.rfind(abs_root, 0) == 0 && abs_f.size() > abs_root.size()) {
+                std::string rel = abs_f.substr(abs_root.size());
+                while (!rel.empty() && (rel[0] == '/' || rel[0] == '\\')) rel.erase(0, 1);
+                for (char& c : rel) if (c == '\\') c = '/';
+                if (EndsWith(rel, ".upp")) rel = rel.substr(0, rel.size() - 4);
+                size_t s = rel.rfind('/');
+                std::string title = (s != std::string::npos) ? rel.substr(s + 1) : rel;
+                std::string parent = (s != std::string::npos) ? rel.substr(0, s) : "";
+                size_t s2 = parent.rfind('/');
+                std::string parent_title = (s2 != std::string::npos) ? parent.substr(s2 + 1) : parent;
+                if (!parent.empty() && title == parent_title) {
+                    all_packages.insert(parent);
+                } else {
+                    all_packages.insert(rel);
+                }
+            }
+        }
+    }
+
+    struct Candidate {
+        std::string name;
+        int distance;
+    };
+    std::vector<Candidate> candidates;
+    for (const auto& p : all_packages) {
+        int dist = LevenshteinDistance(norm, p);
+        if (dist <= 3 || ToLower(p).find(ToLower(norm)) != std::string::npos ||
+            ToLower(norm).find(ToLower(p)) != std::string::npos) {
+            candidates.push_back({p, dist});
+        }
+    }
+
+    std::sort(candidates.begin(), candidates.end(), [](const Candidate& a, const Candidate& b) {
+        return a.distance < b.distance;
+    });
+
+    std::vector<std::string> result;
+    for (size_t i = 0; i < candidates.size() && (int)i < max_matches; ++i) {
+        result.push_back(candidates[i].name);
+    }
+    return result;
+}
+
 bool DependencyGraph::BuildGraph(const std::string& root_pkg_name, const std::set<std::string>& active_flags, bool strict_cycles) {
     nodes_.clear();
     topo_order_.clear();

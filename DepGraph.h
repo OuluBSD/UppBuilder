@@ -29,6 +29,7 @@ public:
     void PrintSummary() const;
 
     std::string FindPackagePath(const std::string& pkg_name) const;
+    std::vector<std::string> FindCloseMatches(const std::string& pkg_name, int max_matches = 3) const;
 
 private:
     const BridgeEngine& bridge_;

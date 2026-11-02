@@ -344,8 +344,19 @@ int main(int argc, char* argv[]) {
     std::string effective_flags;
     DependencyGraph graph(bridge, effective_assembly_roots);
     std::string pkg_upp = graph.FindPackagePath(resolved_target);
+    if (pkg_upp.empty()) {
+        std::cerr << "Error: Package '" << target_pkg << "' does not exist in assembly roots.\n";
+        auto suggestions = graph.FindCloseMatches(resolved_target);
+        if (!suggestions.empty()) {
+            std::cerr << "Did you mean:\n";
+            for (const auto& s : suggestions) {
+                std::cerr << "  * " << s << "\n";
+            }
+        }
+        return 1;
+    }
     UppPackage target_info;
-    bool has_pkg_info = !pkg_upp.empty() && UppParser::Parse(pkg_upp, target_info);
+    bool has_pkg_info = UppParser::Parse(pkg_upp, target_info);
 
     if (!mainconf_pref.empty()) {
         if (has_pkg_info) {
