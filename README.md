@@ -4,6 +4,17 @@
 
 It provides the **3-Pillar Bridge** to enable modular package development, non-destructive file overlays, and surgical upstream patching, alongside deep dependency analysis and header coupling inspection.
 
+## Dependency Hierarchy
+
+Part of the **OuluBSD U++ Modularization Architecture**:
+```
+UppBootstrap  <--  AdvancedBuilder (UppBuilder)  <--  BazaarCore  <--  IDE (DevEnv)
+```
+1. **`UppBootstrap`**: Zero-dependency toolchain bootstrap (`umk` compiler & build methods).
+2. **`AdvancedBuilder` (`UppBuilder`)** (this repo): Standalone meta-builder with 3-pillar bridge, multi-assembly chaining, deterministic config keys.
+3. **`BazaarCore`**: Foundation assembly (`patched-uppsrc`), single amalgamated `Core/Ext`, and Tier 3 packages (`Docking`, `Terminal`, `Manager`...).
+4. **`IDE` (`DevEnv`)**: Modular developer environment application built on top of `BazaarCore` via `UppBuilder`.
+
 ---
 
 ## 🏛️ Architecture: The 3-Pillar Bridge
