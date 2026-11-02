@@ -357,6 +357,40 @@ static std::string ExtractJsonValue(const std::string& json, const std::string& 
     return json.substr(start + 1, end - start - 1);
 }
 
+std::string ResolveBazaarCorePath(const std::string& cli_override, const std::string& repo_root) {
+    if (!cli_override.empty()) return NormalizePath(cli_override);
+
+    std::string env = GetEnvValue("UPP_BAZAARCORE");
+    if (!env.empty()) return NormalizePath(env);
+
+    // If repo_root is BazaarCore itself
+    if (FileExists(JoinPath(repo_root, "patches/Core.patch")) || GetFileTitle(repo_root) == "BazaarCore") {
+        return NormalizePath(repo_root);
+    }
+
+    // Check global config file
+    std::string cfg_file = JoinPath(GetUserConfigDir(), "config.json");
+    if (FileExists(cfg_file)) {
+        std::string json = ReadTextFile(cfg_file);
+        std::string val = ExtractJsonValue(json, "bazaarcore");
+        if (!val.empty() && DirectoryExists(val)) return NormalizePath(val);
+    }
+
+    // Check adjacent/sibling directories
+    std::vector<std::string> candidates = {
+        JoinPath(GetParentDir(repo_root), "BazaarCore"),
+        JoinPath(GetParentDir(repo_root), "bazaarcore"),
+        JoinPath(repo_root, "../BazaarCore")
+    };
+    for (const auto& c : candidates) {
+        if (DirectoryExists(c) && DirectoryExists(JoinPath(c, "uppsrc"))) {
+            return NormalizePath(c);
+        }
+    }
+
+    return "";
+}
+
 std::string ResolvePatchedUppsrcPath(const std::string& cli_override, const std::string& repo_root) {
     if (!cli_override.empty()) return NormalizePath(cli_override);
 

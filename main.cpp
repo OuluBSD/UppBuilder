@@ -32,6 +32,7 @@ void PrintUsage(const char* prog) {
     std::cout << "  --patches-file <file.json>    Load patch list from JSON file\n";
     std::cout << "  --staging-dir <dir>           Custom staging directory (default: .uppbuilder/staging)\n\n";
     std::cout << "Applied-Patches & Restructuring Options:\n";
+    std::cout << "  --bazaarcore <dir>            Path to BazaarCore assembly repository (foundation for other repos)\n";
     std::cout << "  --apply-patches               Materialize applied-patches with restructuring & apply patches\n";
     std::cout << "  --make-patches                Reverse-diff applied-patches against upstream into patches/\n";
     std::cout << "  --applied-patches <dir>       Path to applied-patches directory (default: applied-patches)\n";
@@ -75,9 +76,10 @@ int main(int argc, char* argv[]) {
     std::string report_headers_file;
 
     std::string staging_dir = ".uppbuilder/staging";
-    std::string applied_patches_dir = "applied-patches";
+    std::string applied_patches_dir;
     std::string patches_dir = "patches";
     std::string upstream_dir;
+    std::string custom_bazaarcore;
     bool apply_patches_cmd = false;
     bool make_patches_cmd = false;
     std::string custom_umk;
@@ -125,6 +127,8 @@ int main(int argc, char* argv[]) {
             patches_dir = argv[++i];
         } else if (arg == "--upstream" && i + 1 < argc) {
             upstream_dir = argv[++i];
+        } else if (arg == "--bazaarcore" && i + 1 < argc) {
+            custom_bazaarcore = argv[++i];
         } else if (arg == "--apply-patches") {
             apply_patches_cmd = true;
         } else if (arg == "--make-patches") {
@@ -187,10 +191,13 @@ int main(int argc, char* argv[]) {
         repo_root = GetParentDir(cwd);
     }
 
-    std::string upstream_dir_resolved = ResolveUpstreamPath(upstream_dir, repo_root);
-    std::string full_applied = ResolvePatchedUppsrcPath(applied_patches_dir, repo_root);
+    std::string bazaarcore_dir = ResolveBazaarCorePath(custom_bazaarcore, repo_root);
+    std::string base_for_patches = !bazaarcore_dir.empty() ? bazaarcore_dir : repo_root;
+
+    std::string upstream_dir_resolved = ResolveUpstreamPath(upstream_dir, base_for_patches);
+    std::string full_applied = ResolvePatchedUppsrcPath(applied_patches_dir, base_for_patches);
     std::string full_patches = (StartsWith(patches_dir, "/") || (patches_dir.size() >= 2 && patches_dir[1] == ':')) ?
-                               patches_dir : JoinPath(repo_root, patches_dir);
+                               patches_dir : JoinPath(base_for_patches, patches_dir);
 
     // Handle --make-patches command
     if (make_patches_cmd) {
@@ -222,11 +229,20 @@ int main(int argc, char* argv[]) {
         bridge.MaterializeAppliedPatches(upstream_dir_resolved, full_applied, full_patches, false, verbose);
     }
 
-    // Assemble roots for umk: ONLY patched-uppsrc and repository roots.
-    // Upstream is never passed to umk to avoid dual-Core and unpatched CtrlCore shadowing.
+    // Assemble roots for umk:
+    // 1. Patched upstream foundation assembly (patched Core + upstream packages)
+    // 2. BazaarCore uppsrc (Core/Ext, shims, Terminal, Docking, Manager, etc.) if external
+    // 3. Current repository roots (uppsrc, upptst, src, root)
+    // 4. Any extra roots passed via -a / --add-root
     std::vector<std::string> assembly_roots;
     if (DirectoryExists(full_applied)) {
         assembly_roots.push_back(full_applied);
+    }
+    if (!bazaarcore_dir.empty() && bazaarcore_dir != repo_root) {
+        std::string bz_uppsrc = JoinPath(bazaarcore_dir, "uppsrc");
+        if (DirectoryExists(bz_uppsrc)) {
+            assembly_roots.push_back(bz_uppsrc);
+        }
     }
     assembly_roots.push_back(JoinPath(repo_root, "uppsrc"));
     assembly_roots.push_back(JoinPath(repo_root, "upptst"));
