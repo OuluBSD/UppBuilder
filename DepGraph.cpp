@@ -58,7 +58,7 @@ static int LevenshteinDistance(const std::string& s1, const std::string& s2) {
     for (size_t i = 1; i <= m; ++i) {
         for (size_t j = 1; j <= n; ++j) {
             int cost = (std::tolower((unsigned char)s1[i - 1]) == std::tolower((unsigned char)s2[j - 1])) ? 0 : 1;
-            d[i][j] = std::min({ d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + cost });
+            d[i][j] = (std::min)({ d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + cost });
         }
     }
     return d[m][n];
