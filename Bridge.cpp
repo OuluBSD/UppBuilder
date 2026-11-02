@@ -180,16 +180,23 @@ bool BridgeEngine::ApplySinglePatch(const std::string& patch_path, const std::st
     }
 
     // Try git apply first if inside git or git available
+    const char* dev_null =
+#ifdef _WIN32
+        "NUL";
+#else
+        "/dev/null";
+#endif
+
     std::stringstream cmd;
 #ifndef _WIN32
-    cmd << "patch --batch -N -p" << strip << " -d \"" << target_dir << "\" < \"" << patch_path << "\" > /dev/null 2>&1";
+    cmd << "patch --batch -N -p" << strip << " -d \"" << target_dir << "\" < \"" << patch_path << "\" > " << dev_null << " 2>&1";
     if (RunCommand(cmd.str()) == 0) {
         if (verbose) std::cout << "Successfully applied patch " << patch_path << " via patch tool\n";
         return true;
     }
 #endif
     cmd.str("");
-    cmd << "git apply --whitespace=nowarn --directory=\"" << target_dir << "\" -p" << strip << " \"" << patch_path << "\" > /dev/null 2>&1";
+    cmd << "git apply --whitespace=nowarn --directory=\"" << target_dir << "\" -p" << strip << " \"" << patch_path << "\" > " << dev_null << " 2>&1";
     if (RunCommand(cmd.str()) == 0) {
         if (verbose) std::cout << "Successfully applied patch " << patch_path << " via git apply\n";
         return true;

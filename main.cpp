@@ -184,11 +184,23 @@ int main(int argc, char* argv[]) {
 
     std::string cwd = GetCurrentDir();
     std::string repo_root = cwd;
-    // Discover repo root if in subfolder
-    if (DirectoryExists(JoinPath(cwd, "uppsrc"))) {
-        repo_root = cwd;
-    } else if (DirectoryExists(JoinPath(GetParentDir(cwd), "uppsrc"))) {
-        repo_root = GetParentDir(cwd);
+    // Discover repo root: search upwards for .git first, then fallback to uppsrc
+    std::string search = cwd;
+    while (!search.empty()) {
+        if (DirectoryExists(JoinPath(search, ".git"))) {
+            repo_root = search;
+            break;
+        }
+        std::string parent = GetParentDir(search);
+        if (parent == search || parent.empty()) break;
+        search = parent;
+    }
+    if (repo_root == cwd && !DirectoryExists(JoinPath(cwd, ".git"))) {
+        if (DirectoryExists(JoinPath(cwd, "uppsrc"))) {
+            repo_root = cwd;
+        } else if (DirectoryExists(JoinPath(GetParentDir(cwd), "uppsrc"))) {
+            repo_root = GetParentDir(cwd);
+        }
     }
 
     std::string bazaarcore_dir = ResolveBazaarCorePath(custom_bazaarcore, repo_root);
