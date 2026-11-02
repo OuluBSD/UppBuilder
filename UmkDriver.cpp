@@ -21,7 +21,9 @@ std::string UmkDriver::ResolveUmkExecutable(const std::string& custom_path) cons
         JoinPath(JoinPath(exe_dir, "bin"), binary_name),
         JoinPath(JoinPath(GetParentDir(exe_dir), "bin"), binary_name),
         JoinPath(JoinPath(GetParentDir(GetParentDir(exe_dir)), "bin"), binary_name),
-        JoinPath(JoinPath(GetParentDir(exe_dir), "UppBootstrap"), binary_name)
+        JoinPath(JoinPath(GetParentDir(exe_dir), "UppBootstrap"), binary_name),
+        JoinPath(JoinPath(JoinPath(GetParentDir(exe_dir), "UppBootstrap"), "bin"), binary_name),
+        JoinPath(JoinPath(JoinPath(GetParentDir(GetParentDir(exe_dir)), "UppBootstrap"), "bin"), binary_name)
     };
 
     for (const auto& c : candidates) {
