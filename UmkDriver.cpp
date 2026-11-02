@@ -136,6 +136,125 @@ BuildMethodInfo UmkDriver::FindBestMethod(const std::vector<BuildMethodInfo>& me
     return methods[0];
 }
 
+std::string UmkDriver::ComputeConfigKey(const BuildMethodInfo& method,
+                                       const std::string& mainconfig_flags,
+                                       bool release,
+                                       bool blitz,
+                                       int shared_mode,
+                                       bool minimal_debug) const {
+    std::set<std::string> flags;
+
+    // Builder flag
+    std::string b_upper = ToUpper(method.builder);
+    std::string n_upper = ToUpper(method.name);
+    if (b_upper.find("CLANG") != std::string::npos || n_upper.find("CLANG") != std::string::npos) {
+        flags.insert("Clang");
+    } else if (b_upper.find("GCC") != std::string::npos || n_upper.find("GCC") != std::string::npos ||
+               b_upper.find("MINGW") != std::string::npos || n_upper.find("MINGW") != std::string::npos) {
+        flags.insert("Gcc");
+    } else if (b_upper.find("MSC") != std::string::npos || n_upper.find("MSC") != std::string::npos ||
+               b_upper.find("MSVS") != std::string::npos || n_upper.find("MSVS") != std::string::npos) {
+        flags.insert("Msc");
+    }
+
+    // Blitz
+    if (blitz) {
+        flags.insert("Blitz");
+    } else if (!release) {
+        flags.insert("NoBlitz");
+    }
+
+    // Debug / Release
+    if (release) {
+        flags.insert("Release");
+    } else {
+        flags.insert("Debug");
+        if (minimal_debug) {
+            flags.insert("Debug_Minimal");
+        } else {
+            flags.insert("Debug_Full");
+        }
+    }
+
+    // Platform flags
+#if defined(__linux__) || defined(__gnu_linux__)
+    flags.insert("Linux");
+    flags.insert("Posix");
+#elif defined(_WIN32)
+    flags.insert("Win32");
+#elif defined(__APPLE__)
+    flags.insert("Cocoa");
+    flags.insert("Posix");
+    flags.insert("Osx");
+#elif defined(__FreeBSD__)
+    flags.insert("Freebsd");
+    flags.insert("Posix");
+    flags.insert("Bsd");
+#elif defined(__OpenBSD__)
+    flags.insert("Openbsd");
+    flags.insert("Posix");
+    flags.insert("Bsd");
+#else
+    flags.insert("Posix");
+#endif
+
+    // Shared / Static
+    bool is_shared = false;
+    if (shared_mode == 2 || shared_mode == 3) {
+        is_shared = true;
+    } else if (shared_mode == 0) {
+#ifndef _WIN32
+        is_shared = true;
+#else
+        if (b_upper.find("CLANG") != std::string::npos || b_upper.find("GCC") != std::string::npos ||
+            b_upper.find("MINGW") != std::string::npos) {
+            is_shared = true;
+        }
+#endif
+    }
+    if (is_shared) {
+        flags.insert("Shared");
+        if (shared_mode == 3) {
+            flags.insert("So");
+        }
+    }
+
+    // Mainconfig custom flags
+    if (!mainconfig_flags.empty()) {
+        std::string cur;
+        for (char c : mainconfig_flags) {
+            if (c == ' ' || c == ',' || c == ';' || c == '+') {
+                if (!cur.empty()) {
+                    std::string u = ToUpper(cur);
+                    if (u != "DEBUG" && u != "DEBUG_FULL" && u != "DEBUG_MINIMAL" &&
+                        u != "RELEASE" && u != "BLITZ" && u != "NOBLITZ" &&
+                        u != "SHARED" && u != "SO" && u != "MAIN") {
+                        flags.insert(ToInitCaps(cur));
+                    }
+                    cur.clear();
+                }
+            } else {
+                cur += c;
+            }
+        }
+        if (!cur.empty()) {
+            std::string u = ToUpper(cur);
+            if (u != "DEBUG" && u != "DEBUG_FULL" && u != "DEBUG_MINIMAL" &&
+                u != "RELEASE" && u != "BLITZ" && u != "NOBLITZ" &&
+                u != "SHARED" && u != "SO" && u != "MAIN") {
+                flags.insert(ToInitCaps(cur));
+            }
+        }
+    }
+
+    // Build key: <METHOD_NAME>-<Sorted_Flags>
+    std::string key = method.name;
+    for (const auto& f : flags) {
+        key += "-" + f;
+    }
+    return key;
+}
+
 int UmkDriver::ExecuteBuild(const std::string& umk_exe,
                            const std::vector<std::string>& assembly_roots,
                            const std::string& target_package,

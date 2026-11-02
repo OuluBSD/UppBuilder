@@ -18,6 +18,14 @@ public:
     std::vector<BuildMethodInfo> CollectMethods(const std::string& repo_root = "") const;
     BuildMethodInfo FindBestMethod(const std::vector<BuildMethodInfo>& methods, const std::string& preferred = "") const;
 
+    // Computes deterministic configuration key matching umk out directory format
+    std::string ComputeConfigKey(const BuildMethodInfo& method,
+                                 const std::string& mainconfig_flags,
+                                 bool release,
+                                 bool blitz,
+                                 int shared_mode,
+                                 bool minimal_debug = false) const;
+
     // Executes umk
     int ExecuteBuild(const std::string& umk_exe,
                      const std::vector<std::string>& assembly_roots,

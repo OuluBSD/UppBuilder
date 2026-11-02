@@ -56,6 +56,7 @@ std::string Trim(const std::string& s);
 std::vector<std::string> Split(const std::string& s, char sep);
 std::string ToLower(std::string s);
 std::string ToUpper(std::string s);
+std::string ToInitCaps(const std::string& s);
 std::string Replace(std::string s, const std::string& from, const std::string& to);
 std::string JoinStrings(const std::vector<std::string>& items, const std::string& sep);
 std::string GetEnvValue(const char* name);
@@ -79,6 +80,9 @@ bool WriteTextFile(const std::string& path, const std::string& content);
 bool CopyFile(const std::string& src, const std::string& dst);
 bool CopyDirectoryRecursive(const std::string& src, const std::string& dst);
 bool RemoveDirectoryRecursive(const std::string& path);
+bool CreateEntrypoint(const std::string& technical_binary,
+                      const std::string& entrypoint_path,
+                      const std::string& relative_target);
 int RunCommand(const std::string& cmd);
 std::string CaptureCommand(const std::string& cmd);
 

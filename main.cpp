@@ -323,30 +323,16 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    if (verbose) {
-        std::cout << "Target: " << target_pkg << "\n";
-        std::cout << "Method: " << method.name << " (" << method.path << ")\n";
-        std::cout << "umk:    " << umk_exe << "\n";
-    }
-
-    // Target binary location
-    if (output_path.empty()) {
-        std::string out_dir = JoinPath(JoinPath(repo_root, "bin"), method.name);
-        std::string binary_name = GetFileTitle(target_pkg);
-#ifdef _WIN32
-        binary_name += ".exe";
-#endif
-        output_path = JoinPath(out_dir, binary_name);
-    }
-
     std::string resolved_target = bridge.ResolveRedirect(target_pkg);
 
     std::string effective_flags;
+    DependencyGraph graph(bridge, effective_assembly_roots);
+    std::string pkg_upp = graph.FindPackagePath(resolved_target);
+    UppPackage target_info;
+    bool has_pkg_info = !pkg_upp.empty() && UppParser::Parse(pkg_upp, target_info);
+
     if (!mainconf_pref.empty()) {
-        DependencyGraph graph(bridge, effective_assembly_roots);
-        std::string pkg_upp = graph.FindPackagePath(resolved_target);
-        UppPackage target_info;
-        if (!pkg_upp.empty() && UppParser::Parse(pkg_upp, target_info)) {
+        if (has_pkg_info) {
             bool found = false;
             char* endp = nullptr;
             long idx = strtol(mainconf_pref.c_str(), &endp, 10);
@@ -366,6 +352,31 @@ int main(int argc, char* argv[]) {
         } else {
             effective_flags = mainconf_pref;
         }
+    } else if (has_pkg_info && !target_info.mainconfigs.empty()) {
+        effective_flags = target_info.mainconfigs[0].flags;
+    }
+
+    // Deterministic configuration key (matching umk output structure)
+    std::string config_key = umk_driver.ComputeConfigKey(method, effective_flags, release, true, shared_mode, false);
+
+    bool is_default_output = output_path.empty();
+    std::string binary_name = GetFileTitle(target_pkg);
+#ifdef _WIN32
+    binary_name += ".exe";
+#endif
+
+    // Target technical binary location: bin/<CONFIG_KEY>/<target_name>
+    if (is_default_output) {
+        std::string technical_dir = JoinPath(JoinPath(repo_root, "bin"), config_key);
+        output_path = JoinPath(technical_dir, binary_name);
+    }
+
+    if (verbose) {
+        std::cout << "Target:     " << target_pkg << "\n";
+        std::cout << "ConfigKey:  " << config_key << "\n";
+        std::cout << "Output:     " << output_path << "\n";
+        std::cout << "Method:     " << method.name << " (" << method.path << ")\n";
+        std::cout << "umk:        " << umk_exe << "\n";
     }
 
     int res = umk_driver.ExecuteBuild(umk_exe,
@@ -382,6 +393,39 @@ int main(int argc, char* argv[]) {
 
     if (res == 0) {
         std::cout << "==> UppBuilder: Build succeeded: " << output_path << "\n";
+
+        if (is_default_output) {
+            std::string bin_dir = JoinPath(repo_root, "bin");
+            std::string top_entry = JoinPath(bin_dir, binary_name);
+            std::string rel_to_tech = config_key + "/" + binary_name;
+
+            if (CreateEntrypoint(output_path, top_entry, rel_to_tech)) {
+                std::cout << "==> UppBuilder: Entrypoint created: " << top_entry << " -> " << rel_to_tech << "\n";
+            }
+
+            // If target_pkg has a subfolder (e.g. ide/Android, DevEnv/App), also create bin/<target_pkg>
+            std::string normalized_pkg = target_pkg;
+            std::replace(normalized_pkg.begin(), normalized_pkg.end(), '\\', '/');
+            size_t slash_pos = normalized_pkg.rfind('/');
+            if (slash_pos != std::string::npos) {
+                std::string sub_entry = JoinPath(bin_dir, target_pkg);
+#ifdef _WIN32
+                if (!EndsWith(sub_entry, ".exe")) sub_entry += ".exe";
+#endif
+                int depth = 0;
+                for (size_t k = 0; k <= slash_pos; ++k) {
+                    if (normalized_pkg[k] == '/') depth++;
+                }
+                std::string prefix;
+                for (int d = 0; d < depth; ++d) prefix += "../";
+                std::string sub_rel = prefix + config_key + "/" + binary_name;
+
+                if (CreateEntrypoint(output_path, sub_entry, sub_rel)) {
+                    std::cout << "==> UppBuilder: Entrypoint created: " << sub_entry << " -> " << sub_rel << "\n";
+                }
+            }
+        }
+
         if (copy_deps) {
             std::set<std::string> copied;
             std::vector<std::string> search_dirs = { GetParentDir(output_path), GetParentDir(method.path) };

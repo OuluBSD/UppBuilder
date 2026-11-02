@@ -37,6 +37,19 @@ std::string ToUpper(std::string s) {
     return s;
 }
 
+std::string ToInitCaps(const std::string& s) {
+    std::string r;
+    bool spc = true;
+    for (char c : s) {
+        if (spc)
+            r += (char)std::toupper((unsigned char)c);
+        else
+            r += (char)std::tolower((unsigned char)c);
+        spc = !std::isalnum((unsigned char)c);
+    }
+    return r;
+}
+
 std::string Replace(std::string s, const std::string& from, const std::string& to) {
     size_t start_pos = 0;
     while ((start_pos = s.find(from, start_pos)) != std::string::npos) {
@@ -261,6 +274,21 @@ bool RemoveDirectoryRecursive(const std::string& path) {
     return RemoveDirectoryA(path.c_str()) != 0;
 #else
     return rmdir(path.c_str()) == 0;
+#endif
+}
+
+bool CreateEntrypoint(const std::string& technical_binary,
+                      const std::string& entrypoint_path,
+                      const std::string& relative_target) {
+    RealizeDirectory(GetParentDir(entrypoint_path));
+#ifdef _WIN32
+    // Windows non-admin users cannot create symlinks without Developer Mode.
+    // Copy technical executable to entrypoint location.
+    return CopyFile(technical_binary, entrypoint_path);
+#else
+    // On POSIX, remove existing symlink/file and create relative symlink
+    unlink(entrypoint_path.c_str());
+    return symlink(relative_target.c_str(), entrypoint_path.c_str()) == 0;
 #endif
 }
 
