@@ -293,7 +293,15 @@ bool CreateEntrypoint(const std::string& technical_binary,
 }
 
 int RunCommand(const std::string& cmd) {
-    return std::system(cmd.c_str());
+    int ret = std::system(cmd.c_str());
+#ifndef _WIN32
+    if (WIFEXITED(ret)) {
+        return WEXITSTATUS(ret);
+    } else if (WIFSIGNALED(ret)) {
+        return 128 + WTERMSIG(ret);
+    }
+#endif
+    return ret;
 }
 
 std::string CaptureCommand(const std::string& cmd) {
