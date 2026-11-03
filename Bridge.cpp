@@ -271,10 +271,14 @@ bool BridgeEngine::CreateCompatibilityShims(const std::string& target_uppsrc, bo
     // 2. CtrlLib shim
     std::string cl_dir = JoinPath(target_uppsrc, "CtrlLib");
     RealizeDirectory(cl_dir);
-    std::string cl_upp = "description \"Compatibility forwarding shim to Ctrl/Lib\\377\";\n\nuses\n\tCtrl/Lib;\n\nfile\n\tCtrlLib.h;\n";
+    std::string cl_upp = "description \"Compatibility forwarding shim to Ctrl/Lib\\377\";\n\nuses\n\tCtrl/Lib;\n\nfile\n\tCtrlLib.h,\n\tkey_header.h,\n\tkey_source.h;\n";
     WriteTextFile(JoinPath(cl_dir, "CtrlLib.upp"), cl_upp);
     std::string cl_h = "#ifndef _CtrlLib_CtrlLib_h_\n#define _CtrlLib_CtrlLib_h_\n\n// Forwarding shim to restructured Ctrl/Lib\n#include <Ctrl/Lib/CtrlLib.h>\n\n#endif\n";
     WriteTextFile(JoinPath(cl_dir, "CtrlLib.h"), cl_h);
+    std::string cl_key_h = "#include <Ctrl/Lib/key_header.h>\n";
+    WriteTextFile(JoinPath(cl_dir, "key_header.h"), cl_key_h);
+    std::string cl_key_src = "#include <Ctrl/Lib/key_source.h>\n";
+    WriteTextFile(JoinPath(cl_dir, "key_source.h"), cl_key_src);
 
     if (verbose) {
         std::cout << "Created compatibility shims for CtrlCore and CtrlLib in " << target_uppsrc << "\n";
