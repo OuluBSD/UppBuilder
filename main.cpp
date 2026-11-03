@@ -82,6 +82,7 @@ int main(int argc, char* argv[]) {
     std::string custom_bazaarcore;
     std::string custom_superintelligence;
     std::string custom_commandcenter;
+    std::string custom_ai;
     bool apply_patches_cmd = false;
     bool make_patches_cmd = false;
     std::string custom_umk;
@@ -135,6 +136,8 @@ int main(int argc, char* argv[]) {
             custom_superintelligence = argv[++i];
         } else if ((arg == "--commandcenter" || arg == "--commandbridge") && i + 1 < argc) {
             custom_commandcenter = argv[++i];
+        } else if ((arg == "--ai" || arg == "--artificialintelligence" || arg == "--artificalintelligence") && i + 1 < argc) {
+            custom_ai = argv[++i];
         } else if (arg == "--apply-patches") {
             apply_patches_cmd = true;
         } else if (arg == "--make-patches") {
@@ -269,6 +272,18 @@ int main(int argc, char* argv[]) {
             assembly_roots.push_back(s_uppsrc);
         } else {
             assembly_roots.push_back(superintel_dir);
+        }
+    }
+    std::string ai_dir = ResolveSiblingRepoPath("ArtificialIntelligence", custom_ai, repo_root);
+    if (ai_dir.empty()) {
+        ai_dir = ResolveSiblingRepoPath("ArtificalIntelligence", custom_ai, repo_root);
+    }
+    if (!ai_dir.empty() && ai_dir != repo_root) {
+        std::string a_uppsrc = JoinPath(ai_dir, "uppsrc");
+        if (DirectoryExists(a_uppsrc)) {
+            assembly_roots.push_back(a_uppsrc);
+        } else {
+            assembly_roots.push_back(ai_dir);
         }
     }
     std::string commandcenter_dir = ResolveSiblingRepoPath("CommandCenter", custom_commandcenter, repo_root);
