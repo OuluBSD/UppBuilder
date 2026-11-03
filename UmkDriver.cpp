@@ -372,7 +372,37 @@ int UmkDriver::ExecuteBuild(const std::string& umk_exe,
         std::cout << "Executing umk command:\n  " << ss.str() << "\n";
     }
 
-    return RunCommand(ss.str());
+    int res = RunCommand(ss.str());
+
+#ifdef _WIN32
+    if (res == 0) {
+        std::vector<std::string> vcpkg_bin_dirs = {
+            "C:\\vcpkg\\installed\\x64-windows\\bin",
+            "C:\\vcpkg\\installed\\x64-windows\\debug\\bin"
+        };
+        std::string target_dir = "";
+        if (!output_binary.empty()) {
+            target_dir = GetParentDir(output_binary);
+        } else if (DirectoryExists("bin")) {
+            target_dir = "bin";
+        }
+        for (const auto& bdir : vcpkg_bin_dirs) {
+            if (!DirectoryExists(bdir)) continue;
+            for (const auto& f : ListDir(bdir)) {
+                if (EndsWith(ToLower(f), ".dll")) {
+                    std::string src = JoinPath(bdir, f);
+                    if (!target_dir.empty() && DirectoryExists(target_dir)) {
+                        std::string dst = JoinPath(target_dir, f);
+                        if (!FileExists(dst)) CopyFile(src, dst);
+                    }
+                    if (!FileExists(f)) CopyFile(src, f);
+                }
+            }
+        }
+    }
+#endif
+
+    return res;
 }
 
 } // namespace UppBuilder
