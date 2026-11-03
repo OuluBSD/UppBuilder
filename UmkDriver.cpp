@@ -317,6 +317,32 @@ int UmkDriver::ExecuteBuild(const std::string& umk_exe,
         ss << " \"" << output_binary << "\"";
     }
 
+#ifdef _WIN32
+    // On Windows with MSVC, upstream U++ packages expect legacy library names like zs.lib (zlib)
+    // whereas vcpkg provides zlib.lib. Automatically create compatibility shims in LIB directories.
+    std::string lib_env = GetEnvValue("LIB");
+    for (const auto& dir : Split(lib_env, ';')) {
+        if (!DirectoryExists(dir)) continue;
+        std::string zlib_lib = JoinPath(dir, "zlib.lib");
+        if (FileExists(zlib_lib)) {
+            std::string zs_lib = JoinPath(dir, "zs.lib");
+            if (!FileExists(zs_lib)) CopyFile(zlib_lib, zs_lib);
+            std::string z_lib = JoinPath(dir, "z.lib");
+            if (!FileExists(z_lib)) CopyFile(zlib_lib, z_lib);
+        }
+        std::string pcre2_8_lib = JoinPath(dir, "pcre2-8.lib");
+        if (FileExists(pcre2_8_lib)) {
+            std::string pcre2_lib = JoinPath(dir, "pcre2.lib");
+            if (!FileExists(pcre2_lib)) CopyFile(pcre2_8_lib, pcre2_lib);
+        }
+        std::string libpng16_lib = JoinPath(dir, "libpng16.lib");
+        if (FileExists(libpng16_lib)) {
+            std::string png_lib = JoinPath(dir, "png.lib");
+            if (!FileExists(png_lib)) CopyFile(libpng16_lib, png_lib);
+        }
+    }
+#endif
+
     if (verbose) {
         std::cout << "Executing umk command:\n  " << ss.str() << "\n";
     }
