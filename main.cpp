@@ -80,6 +80,8 @@ int main(int argc, char* argv[]) {
     std::string patches_dir = "patches";
     std::string upstream_dir;
     std::string custom_bazaarcore;
+    std::string custom_superintelligence;
+    std::string custom_commandbridge;
     bool apply_patches_cmd = false;
     bool make_patches_cmd = false;
     std::string custom_umk;
@@ -129,6 +131,10 @@ int main(int argc, char* argv[]) {
             upstream_dir = argv[++i];
         } else if (arg == "--bazaarcore" && i + 1 < argc) {
             custom_bazaarcore = argv[++i];
+        } else if (arg == "--superintelligence" && i + 1 < argc) {
+            custom_superintelligence = argv[++i];
+        } else if (arg == "--commandbridge" && i + 1 < argc) {
+            custom_commandbridge = argv[++i];
         } else if (arg == "--apply-patches") {
             apply_patches_cmd = true;
         } else if (arg == "--make-patches") {
@@ -255,6 +261,23 @@ int main(int argc, char* argv[]) {
         if (DirectoryExists(bz_uppsrc)) {
             assembly_roots.push_back(bz_uppsrc);
         }
+    }
+    std::string superintel_dir = ResolveSiblingRepoPath("SuperIntelligence", custom_superintelligence, repo_root);
+    if (!superintel_dir.empty() && superintel_dir != repo_root) {
+        std::string s_uppsrc = JoinPath(superintel_dir, "uppsrc");
+        if (DirectoryExists(s_uppsrc)) {
+            assembly_roots.push_back(s_uppsrc);
+        } else {
+            assembly_roots.push_back(superintel_dir);
+        }
+    }
+    std::string commandbridge_dir = ResolveSiblingRepoPath("CommandBridge", custom_commandbridge, repo_root);
+    if (!commandbridge_dir.empty() && commandbridge_dir != repo_root) {
+        std::string c_uppsrc = JoinPath(commandbridge_dir, "uppsrc");
+        if (DirectoryExists(c_uppsrc)) {
+            assembly_roots.push_back(c_uppsrc);
+        }
+        assembly_roots.push_back(commandbridge_dir);
     }
     assembly_roots.push_back(JoinPath(repo_root, "uppsrc"));
     assembly_roots.push_back(JoinPath(repo_root, "upptst"));

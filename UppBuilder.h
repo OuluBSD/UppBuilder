@@ -93,6 +93,7 @@ std::string CaptureCommand(const std::string& cmd);
 std::string GetUserConfigDir();
 std::string GetUserCacheDir();
 std::string ResolveBazaarCorePath(const std::string& cli_override, const std::string& repo_root);
+std::string ResolveSiblingRepoPath(const std::string& repo_name, const std::string& cli_override, const std::string& repo_root);
 std::string ResolvePatchedUppsrcPath(const std::string& cli_override, const std::string& repo_root);
 std::string ResolveUpstreamPath(const std::string& cli_override, const std::string& repo_root);
 std::string ReplaceWholeWord(const std::string& str, const std::string& from, const std::string& to);

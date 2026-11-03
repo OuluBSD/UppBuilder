@@ -399,6 +399,34 @@ std::string ResolveBazaarCorePath(const std::string& cli_override, const std::st
     return "";
 }
 
+std::string ResolveSiblingRepoPath(const std::string& repo_name, const std::string& cli_override, const std::string& repo_root) {
+    if (!cli_override.empty()) return NormalizePath(cli_override);
+
+    std::string env_name = "UPP_";
+    for (char ch : repo_name) {
+        if (ch == '-' || ch == ' ') env_name += '_';
+        else env_name += (char)::toupper((unsigned char)ch);
+    }
+    std::string env = GetEnvValue(env_name.c_str());
+    if (!env.empty() && DirectoryExists(env)) return NormalizePath(env);
+
+    std::string lower_name = repo_name;
+    for (char& ch : lower_name) ch = (char)::tolower((unsigned char)ch);
+
+    std::vector<std::string> candidates = {
+        JoinPath(GetParentDir(repo_root), repo_name),
+        JoinPath(GetParentDir(repo_root), lower_name),
+        JoinPath(repo_root, "../" + repo_name),
+        JoinPath(repo_root, "../" + lower_name)
+    };
+    for (const auto& c : candidates) {
+        if (DirectoryExists(c)) {
+            return NormalizePath(c);
+        }
+    }
+    return "";
+}
+
 std::string ResolvePatchedUppsrcPath(const std::string& cli_override, const std::string& repo_root) {
     if (!cli_override.empty()) return NormalizePath(cli_override);
 
