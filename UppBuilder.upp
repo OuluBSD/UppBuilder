@@ -4,6 +4,7 @@ uses
 	Core;
 
 file
+	AGENTS.md,
 	UppBuilder.h,
 	Bridge.h,
 	Bridge.cpp,
