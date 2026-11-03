@@ -319,27 +319,34 @@ int UmkDriver::ExecuteBuild(const std::string& umk_exe,
 
 #ifdef _WIN32
     // On Windows with MSVC, upstream U++ packages expect legacy library names like zs.lib (zlib)
-    // whereas vcpkg provides zlib.lib. Automatically create compatibility shims in LIB directories.
+    // whereas vcpkg provides zlib.lib/zlibd.lib. Automatically create compatibility shims in LIB directories and cwd.
     std::vector<std::string> search_dirs = Split(GetEnvValue("LIB"), ';');
     search_dirs.push_back("C:\\vcpkg\\installed\\x64-windows\\lib");
+    search_dirs.push_back("C:\\vcpkg\\installed\\x64-windows\\debug\\lib");
     for (const auto& dir : search_dirs) {
         if (!DirectoryExists(dir)) continue;
-        std::string zlib_lib = JoinPath(dir, "zlib.lib");
-        if (FileExists(zlib_lib)) {
-            std::string zs_lib = JoinPath(dir, "zs.lib");
-            if (!FileExists(zs_lib)) CopyFile(zlib_lib, zs_lib);
-            std::string z_lib = JoinPath(dir, "z.lib");
-            if (!FileExists(z_lib)) CopyFile(zlib_lib, z_lib);
-        }
-        std::string pcre2_8_lib = JoinPath(dir, "pcre2-8.lib");
-        if (FileExists(pcre2_8_lib)) {
-            std::string pcre2_lib = JoinPath(dir, "pcre2.lib");
-            if (!FileExists(pcre2_lib)) CopyFile(pcre2_8_lib, pcre2_lib);
-        }
-        std::string libpng16_lib = JoinPath(dir, "libpng16.lib");
-        if (FileExists(libpng16_lib)) {
-            std::string png_lib = JoinPath(dir, "png.lib");
-            if (!FileExists(png_lib)) CopyFile(libpng16_lib, png_lib);
+        for (const auto& f : ListDir(dir)) {
+            std::string fl = ToLower(f);
+            if (!EndsWith(fl, ".lib")) continue;
+            std::string src = JoinPath(dir, f);
+            if (fl.find("zlib") != std::string::npos || fl == "z.lib" || fl == "libz.lib") {
+                std::string zs_lib = JoinPath(dir, "zs.lib");
+                if (!FileExists(zs_lib)) CopyFile(src, zs_lib);
+                std::string z_lib = JoinPath(dir, "z.lib");
+                if (!FileExists(z_lib)) CopyFile(src, z_lib);
+                if (!FileExists("zs.lib")) CopyFile(src, "zs.lib");
+                if (!FileExists("z.lib")) CopyFile(src, "z.lib");
+            }
+            if (fl.find("pcre2") != std::string::npos) {
+                std::string pcre2_lib = JoinPath(dir, "pcre2.lib");
+                if (!FileExists(pcre2_lib)) CopyFile(src, pcre2_lib);
+                if (!FileExists("pcre2.lib")) CopyFile(src, "pcre2.lib");
+            }
+            if (fl.find("png") != std::string::npos) {
+                std::string png_lib = JoinPath(dir, "png.lib");
+                if (!FileExists(png_lib)) CopyFile(src, png_lib);
+                if (!FileExists("png.lib")) CopyFile(src, "png.lib");
+            }
         }
     }
 #elif defined(__APPLE__)
