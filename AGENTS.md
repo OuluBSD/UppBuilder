@@ -58,7 +58,7 @@ When building a package from any workspace, `UppBuilder` auto-resolves sibling r
 1. **`BazaarCore/patched-uppsrc`**: Patched upstream Core and foundation assemblies.
 2. **`BazaarCore/uppsrc`**: Modular packages (`Core/Ext`, `Docking`, `Terminal`, `Manager`, `VirtualGui`...).
 3. **`SuperIntelligence/uppsrc`** (or `SuperIntelligence`): AI/LLM agent packages (`SweAgent`, etc.).
-4. **`CommandBridge/uppsrc`** (or `CommandBridge`): DropTerm and IPC bridge packages.
+4. **`CommandCenter/uppsrc`** (or `CommandCenter`): DropTerm and terminal multiplexing.
 5. **Target Repository**: Local roots (`uppsrc`, `upptst`, `src`, `.`).
 6. **Command-Line Overrides**: `--add-root <dir>` / `-a <dir>`.
 

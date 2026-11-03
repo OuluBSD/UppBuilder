@@ -81,7 +81,7 @@ int main(int argc, char* argv[]) {
     std::string upstream_dir;
     std::string custom_bazaarcore;
     std::string custom_superintelligence;
-    std::string custom_commandbridge;
+    std::string custom_commandcenter;
     bool apply_patches_cmd = false;
     bool make_patches_cmd = false;
     std::string custom_umk;
@@ -133,8 +133,8 @@ int main(int argc, char* argv[]) {
             custom_bazaarcore = argv[++i];
         } else if (arg == "--superintelligence" && i + 1 < argc) {
             custom_superintelligence = argv[++i];
-        } else if (arg == "--commandbridge" && i + 1 < argc) {
-            custom_commandbridge = argv[++i];
+        } else if ((arg == "--commandcenter" || arg == "--commandbridge") && i + 1 < argc) {
+            custom_commandcenter = argv[++i];
         } else if (arg == "--apply-patches") {
             apply_patches_cmd = true;
         } else if (arg == "--make-patches") {
@@ -271,13 +271,16 @@ int main(int argc, char* argv[]) {
             assembly_roots.push_back(superintel_dir);
         }
     }
-    std::string commandbridge_dir = ResolveSiblingRepoPath("CommandBridge", custom_commandbridge, repo_root);
-    if (!commandbridge_dir.empty() && commandbridge_dir != repo_root) {
-        std::string c_uppsrc = JoinPath(commandbridge_dir, "uppsrc");
+    std::string commandcenter_dir = ResolveSiblingRepoPath("CommandCenter", custom_commandcenter, repo_root);
+    if (commandcenter_dir.empty()) {
+        commandcenter_dir = ResolveSiblingRepoPath("CommandBridge", custom_commandcenter, repo_root);
+    }
+    if (!commandcenter_dir.empty() && commandcenter_dir != repo_root) {
+        std::string c_uppsrc = JoinPath(commandcenter_dir, "uppsrc");
         if (DirectoryExists(c_uppsrc)) {
             assembly_roots.push_back(c_uppsrc);
         }
-        assembly_roots.push_back(commandbridge_dir);
+        assembly_roots.push_back(commandcenter_dir);
     }
     assembly_roots.push_back(JoinPath(repo_root, "uppsrc"));
     assembly_roots.push_back(JoinPath(repo_root, "upptst"));

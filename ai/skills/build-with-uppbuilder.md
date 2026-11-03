@@ -4,7 +4,7 @@
 
 This skill guides AI agents and developers on building U++ packages and assemblies using **`uppbuilder`**, the OuluBSD meta-builder and `umk` driver.
 
-`uppbuilder` replaces legacy shell wrappers and manual `umk` invocations. It automatically discovers multi-assembly dependencies (such as `BazaarCore`, `SuperIntelligence`, and `CommandBridge`), applies the **3-Pillar Bridge** (Package Redirects, File Overlays, Surgical Patches), and generates deterministic, non-colliding binary directories.
+`uppbuilder` replaces legacy shell wrappers and manual `umk` invocations. It automatically discovers multi-assembly dependencies (such as `BazaarCore`, `SuperIntelligence`, and `CommandCenter`), applies the **3-Pillar Bridge** (Package Redirects, File Overlays, Surgical Patches), and generates deterministic, non-colliding binary directories.
 
 ---
 
@@ -59,7 +59,7 @@ uppbuilder TargetPackage -v
 1. `BazaarCore/patched-uppsrc` (patched upstream Core and foundation)
 2. `BazaarCore/uppsrc` (modular packages: `Core/Ext`, `Docking`, `Terminal`, `Manager`, `VirtualGui`)
 3. `SuperIntelligence/uppsrc` or `SuperIntelligence` (AI and agent infrastructure: `SweAgent`)
-4. `CommandBridge/uppsrc` or `CommandBridge` (DropTerm and terminal multiplexing)
+4. `CommandCenter/uppsrc` or `CommandCenter` (DropTerm and terminal multiplexing)
 5. Current workspace roots: `uppsrc`, `upptst`, `src`, and `.`
 6. Explicit extra roots passed via `-a <path>` / `--add-root <path>`
 
