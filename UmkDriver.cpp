@@ -329,7 +329,7 @@ int UmkDriver::ExecuteBuild(const std::string& umk_exe,
             std::string fl = ToLower(f);
             if (!EndsWith(fl, ".lib")) continue;
             std::string src = JoinPath(dir, f);
-            if (fl.find("zlib") != std::string::npos || fl == "z.lib" || fl == "libz.lib") {
+            if (fl == "z.lib" || fl == "zd.lib" || fl == "zlib.lib" || fl == "zlibd.lib") {
                 std::string zs_lib = JoinPath(dir, "zs.lib");
                 if (!FileExists(zs_lib)) CopyFile(src, zs_lib);
                 std::string z_lib = JoinPath(dir, "z.lib");
