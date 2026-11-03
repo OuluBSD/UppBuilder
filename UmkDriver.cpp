@@ -320,8 +320,9 @@ int UmkDriver::ExecuteBuild(const std::string& umk_exe,
 #ifdef _WIN32
     // On Windows with MSVC, upstream U++ packages expect legacy library names like zs.lib (zlib)
     // whereas vcpkg provides zlib.lib. Automatically create compatibility shims in LIB directories.
-    std::string lib_env = GetEnvValue("LIB");
-    for (const auto& dir : Split(lib_env, ';')) {
+    std::vector<std::string> search_dirs = Split(GetEnvValue("LIB"), ';');
+    search_dirs.push_back("C:\\vcpkg\\installed\\x64-windows\\lib");
+    for (const auto& dir : search_dirs) {
         if (!DirectoryExists(dir)) continue;
         std::string zlib_lib = JoinPath(dir, "zlib.lib");
         if (FileExists(zlib_lib)) {
@@ -339,6 +340,23 @@ int UmkDriver::ExecuteBuild(const std::string& umk_exe,
         if (FileExists(libpng16_lib)) {
             std::string png_lib = JoinPath(dir, "png.lib");
             if (!FileExists(png_lib)) CopyFile(libpng16_lib, png_lib);
+        }
+    }
+#elif defined(__APPLE__)
+    // On macOS, Core/SSL requests libcrypto.a and libssl.a directly.
+    // If OpenSSL was installed via Homebrew, copy them into the working directory so clang++ resolves them.
+    std::vector<std::string> brew_ssl = {
+        "/opt/homebrew/opt/openssl@3/lib",
+        "/usr/local/opt/openssl@3/lib"
+    };
+    for (const auto& dir : brew_ssl) {
+        std::string crypto_a = JoinPath(dir, "libcrypto.a");
+        std::string ssl_a = JoinPath(dir, "libssl.a");
+        if (FileExists(crypto_a) && !FileExists("libcrypto.a")) {
+            CopyFile(crypto_a, "libcrypto.a");
+        }
+        if (FileExists(ssl_a) && !FileExists("libssl.a")) {
+            CopyFile(ssl_a, "libssl.a");
         }
     }
 #endif
