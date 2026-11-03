@@ -1,4 +1,5 @@
 #include "UmkDriver.h"
+#include <thread>
 
 namespace UppBuilder {
 
@@ -296,11 +297,11 @@ int UmkDriver::ExecuteBuild(const std::string& umk_exe,
 #endif
     }
 
-    umk_opts += "uH1";
+    int conc = jobs > 0 ? jobs : (int)std::thread::hardware_concurrency();
+    if (conc <= 0) conc = 2;
+    umk_opts += "uH" + std::to_string(conc);
     if (clean) umk_opts += "a";
     ss << " " << umk_opts;
-
-    if (jobs > 0) ss << " -H" << jobs;
 
     std::string active_flags = flags;
     if (!release) {
