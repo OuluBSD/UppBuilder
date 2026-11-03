@@ -431,14 +431,30 @@ int main(int argc, char* argv[]) {
                                      verbose);
 
     if (res == 0) {
-        std::cout << "==> UppBuilder: Build succeeded: " << output_path << "\n";
+        std::string actual_binary = output_path;
+        bool is_app_bundle = false;
+        std::string app_bundle_path = output_path + ".app";
+        std::string bundle_exec = JoinPath(JoinPath(JoinPath(app_bundle_path, "Contents"), "MacOS"), binary_name);
+        if (FileExists(bundle_exec)) {
+            actual_binary = bundle_exec;
+            is_app_bundle = true;
+        }
+
+        std::cout << "==> UppBuilder: Build succeeded: " << actual_binary << "\n";
 
         if (is_default_output) {
             std::string bin_dir = JoinPath(repo_root, "bin");
             std::string top_entry = JoinPath(bin_dir, binary_name);
             std::string rel_to_tech = config_key + "/" + binary_name;
 
-            if (CreateEntrypoint(output_path, top_entry, rel_to_tech)) {
+            if (is_app_bundle) {
+                rel_to_tech = config_key + "/" + binary_name + ".app/Contents/MacOS/" + binary_name;
+                std::string app_entry = JoinPath(bin_dir, binary_name + ".app");
+                std::string rel_app = config_key + "/" + binary_name + ".app";
+                CreateEntrypoint(app_bundle_path, app_entry, rel_app);
+            }
+
+            if (CreateEntrypoint(actual_binary, top_entry, rel_to_tech)) {
                 std::cout << "==> UppBuilder: Entrypoint created: " << top_entry << " -> " << rel_to_tech << "\n";
             }
 
@@ -458,8 +474,14 @@ int main(int argc, char* argv[]) {
                 std::string prefix;
                 for (int d = 0; d < depth; ++d) prefix += "../";
                 std::string sub_rel = prefix + config_key + "/" + binary_name;
+                if (is_app_bundle) {
+                    sub_rel = prefix + config_key + "/" + binary_name + ".app/Contents/MacOS/" + binary_name;
+                    std::string sub_app_entry = sub_entry + ".app";
+                    std::string sub_app_rel = prefix + config_key + "/" + binary_name + ".app";
+                    CreateEntrypoint(app_bundle_path, sub_app_entry, sub_app_rel);
+                }
 
-                if (CreateEntrypoint(output_path, sub_entry, sub_rel)) {
+                if (CreateEntrypoint(actual_binary, sub_entry, sub_rel)) {
                     std::cout << "==> UppBuilder: Entrypoint created: " << sub_entry << " -> " << sub_rel << "\n";
                 }
             }

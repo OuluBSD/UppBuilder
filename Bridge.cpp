@@ -173,13 +173,160 @@ bool BridgeEngine::PlatformMatches(const std::vector<std::string>& platforms) co
     return false;
 }
 
+static bool ApplyUnifiedDiffNative(const std::string& patch_path, const std::string& target_dir, int strip, bool verbose) {
+    std::string patch_text = ReadTextFile(patch_path);
+    if (patch_text.empty()) return false;
+
+    std::vector<std::string> lines = Split(patch_text, '\n');
+    std::string current_rel_target;
+    std::vector<std::string> target_lines;
+    bool in_hunk = false;
+    std::vector<std::string> hunk_remove;
+    std::vector<std::string> hunk_add;
+    std::vector<std::string> hunk_context_before;
+    std::vector<std::string> hunk_context_after;
+    int hunk_old_start = 0;
+
+    auto flush_hunk = [&]() -> bool {
+        if (!in_hunk || current_rel_target.empty()) return true;
+
+        std::vector<std::string> to_match = hunk_context_before;
+        for (const auto& r : hunk_remove) to_match.push_back(r);
+        for (const auto& a : hunk_context_after) to_match.push_back(a);
+
+        int match_idx = -1;
+
+        auto check_at = [&](int idx) -> bool {
+            if (idx < 0 || idx + (int)to_match.size() > (int)target_lines.size()) return false;
+            for (size_t i = 0; i < to_match.size(); ++i) {
+                std::string l1 = target_lines[idx + i];
+                if (!l1.empty() && l1.back() == '\r') l1.pop_back();
+                std::string l2 = to_match[i];
+                if (!l2.empty() && l2.back() == '\r') l2.pop_back();
+                if (l1 != l2) return false;
+            }
+            return true;
+        };
+
+        if (check_at(hunk_old_start - 1)) {
+            match_idx = hunk_old_start - 1;
+        } else {
+            for (int i = 0; i <= (int)target_lines.size() - (int)to_match.size(); ++i) {
+                if (check_at(i)) {
+                    match_idx = i;
+                    break;
+                }
+            }
+        }
+
+        if (match_idx == -1) {
+            if (verbose) std::cerr << "Native patch: hunk failed to match in " << current_rel_target << "\n";
+            return false;
+        }
+
+        int replace_start = match_idx + (int)hunk_context_before.size();
+        int replace_count = (int)hunk_remove.size();
+
+        std::vector<std::string> new_target_lines;
+        new_target_lines.reserve(target_lines.size() + hunk_add.size());
+        for (int i = 0; i < replace_start; ++i) {
+            new_target_lines.push_back(target_lines[i]);
+        }
+        for (const auto& add_line : hunk_add) {
+            new_target_lines.push_back(add_line);
+        }
+        for (size_t i = replace_start + replace_count; i < target_lines.size(); ++i) {
+            new_target_lines.push_back(target_lines[i]);
+        }
+        target_lines = std::move(new_target_lines);
+
+        in_hunk = false;
+        hunk_remove.clear();
+        hunk_add.clear();
+        hunk_context_before.clear();
+        hunk_context_after.clear();
+        return true;
+    };
+
+    auto save_current_file = [&]() -> bool {
+        if (!current_rel_target.empty()) {
+            if (!flush_hunk()) return false;
+            std::string full_target = JoinPath(target_dir, current_rel_target);
+            std::string content;
+            for (size_t i = 0; i < target_lines.size(); ++i) {
+                content += target_lines[i] + "\n";
+            }
+            if (!WriteTextFile(full_target, content)) return false;
+            if (verbose) std::cout << "Native patch: applied patch to " << full_target << "\n";
+            current_rel_target.clear();
+            target_lines.clear();
+        }
+        return true;
+    };
+
+    for (const auto& line_raw : lines) {
+        std::string line = line_raw;
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+
+        if (StartsWith(line, "+++ ")) {
+            if (!save_current_file()) return false;
+            std::string path_part = Trim(line.substr(4));
+            size_t tab_pos = path_part.find('\t');
+            if (tab_pos != std::string::npos) path_part = path_part.substr(0, tab_pos);
+            std::replace(path_part.begin(), path_part.end(), '\\', '/');
+            for (int s = 0; s < strip; ++s) {
+                size_t slash = path_part.find('/');
+                if (slash != std::string::npos) path_part = path_part.substr(slash + 1);
+            }
+            current_rel_target = path_part;
+            std::string full_target = JoinPath(target_dir, current_rel_target);
+            if (!FileExists(full_target)) {
+                if (verbose) std::cerr << "Native patch: target file not found: " << full_target << "\n";
+                return false;
+            }
+            std::string existing = ReadTextFile(full_target);
+            target_lines = Split(existing, '\n');
+            if (!target_lines.empty() && target_lines.back().empty()) target_lines.pop_back();
+        } else if (StartsWith(line, "@@ ")) {
+            if (in_hunk) {
+                if (!flush_hunk()) return false;
+            }
+            size_t minus = line.find('-');
+            if (minus != std::string::npos) {
+                hunk_old_start = std::atoi(line.c_str() + minus + 1);
+            }
+            in_hunk = true;
+        } else if (in_hunk) {
+            if (line.empty()) {
+                if (hunk_remove.empty() && hunk_add.empty()) {
+                    hunk_context_before.push_back("");
+                } else {
+                    hunk_context_after.push_back("");
+                }
+            } else if (line[0] == ' ') {
+                if (hunk_remove.empty() && hunk_add.empty()) {
+                    hunk_context_before.push_back(line.substr(1));
+                } else {
+                    hunk_context_after.push_back(line.substr(1));
+                }
+            } else if (line[0] == '-') {
+                hunk_remove.push_back(line.substr(1));
+            } else if (line[0] == '+') {
+                hunk_add.push_back(line.substr(1));
+            }
+        }
+    }
+
+    if (!save_current_file()) return false;
+    return true;
+}
+
 bool BridgeEngine::ApplySinglePatch(const std::string& patch_path, const std::string& target_dir, int strip, bool verbose) {
     if (!FileExists(patch_path)) {
         std::cerr << "Patch file does not exist: " << patch_path << "\n";
         return false;
     }
 
-    // Try git apply first if inside git or git available
     const char* dev_null =
 #ifdef _WIN32
         "NUL";
@@ -188,17 +335,32 @@ bool BridgeEngine::ApplySinglePatch(const std::string& patch_path, const std::st
 #endif
 
     std::stringstream cmd;
-#ifndef _WIN32
+    // 1. Try patch tool
     cmd << "patch --batch -N -p" << strip << " -d \"" << target_dir << "\" < \"" << patch_path << "\" > " << dev_null << " 2>&1";
     if (RunCommand(cmd.str()) == 0) {
         if (verbose) std::cout << "Successfully applied patch " << patch_path << " via patch tool\n";
         return true;
     }
-#endif
+
+    // 2. Try git apply with --unsafe-paths from inside target_dir
     cmd.str("");
-    cmd << "git apply --whitespace=nowarn --directory=\"" << target_dir << "\" -p" << strip << " \"" << patch_path << "\" > " << dev_null << " 2>&1";
+    cmd << "cd \"" << target_dir << "\" && git apply --unsafe-paths --whitespace=nowarn -p" << strip << " \"" << patch_path << "\" > " << dev_null << " 2>&1";
+    if (RunCommand(cmd.str()) == 0) {
+        if (verbose) std::cout << "Successfully applied patch " << patch_path << " via git apply (cd)\n";
+        return true;
+    }
+
+    // 3. Try git apply with --unsafe-paths and --directory
+    cmd.str("");
+    cmd << "git apply --unsafe-paths --whitespace=nowarn --directory=\"" << target_dir << "\" -p" << strip << " \"" << patch_path << "\" > " << dev_null << " 2>&1";
     if (RunCommand(cmd.str()) == 0) {
         if (verbose) std::cout << "Successfully applied patch " << patch_path << " via git apply\n";
+        return true;
+    }
+
+    // 4. Robust native C++ unified diff fallback
+    if (ApplyUnifiedDiffNative(patch_path, target_dir, strip, verbose)) {
+        if (verbose) std::cout << "Successfully applied patch " << patch_path << " via native diff applier\n";
         return true;
     }
 
