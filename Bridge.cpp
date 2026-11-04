@@ -425,10 +425,12 @@ bool BridgeEngine::CreateCompatibilityShims(const std::string& target_uppsrc, bo
     // 1. CtrlCore shim
     std::string cc_dir = JoinPath(target_uppsrc, "CtrlCore");
     RealizeDirectory(cc_dir);
-    std::string cc_upp = "description \"Compatibility forwarding shim to Ctrl/Core\\377\";\n\nuses\n\tCtrl/Core;\n\nfile\n\tCtrlCore.h;\n";
+    std::string cc_upp = "description \"Compatibility forwarding shim to Ctrl/Core\\377\";\n\nuses\n\tCtrl/Core;\n\nfile\n\tCtrlCore.h,\n\tlay.h;\n";
     WriteTextFile(JoinPath(cc_dir, "CtrlCore.upp"), cc_upp);
     std::string cc_h = "#ifndef _CtrlCore_CtrlCore_h_\n#define _CtrlCore_CtrlCore_h_\n\n// Forwarding shim to restructured Ctrl/Core\n#include <Ctrl/Core/CtrlCore.h>\n\n#endif\n";
     WriteTextFile(JoinPath(cc_dir, "CtrlCore.h"), cc_h);
+    std::string cc_lay_h = "#include <Ctrl/Core/lay.h>\n";
+    WriteTextFile(JoinPath(cc_dir, "lay.h"), cc_lay_h);
 
     // 2. CtrlLib shim
     std::string cl_dir = JoinPath(target_uppsrc, "CtrlLib");
