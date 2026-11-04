@@ -34,6 +34,7 @@ void PrintUsage(const char* prog) {
     std::cout << "Applied-Patches & Restructuring Options:\n";
     std::cout << "  --bazaarcore <dir>            Path to BazaarCore assembly repository (foundation for other repos)\n";
     std::cout << "  --vfs <dir>                   Path to VFS repository (virtual filesystem & workbench tree template)\n";
+    std::cout << "  --softscript <dir>            Path to SoftScript repository (ByteVM, ScriptCommon, etc.)\n";
     std::cout << "  --apply-patches               Materialize applied-patches with restructuring & apply patches\n";
     std::cout << "  --make-patches                Reverse-diff applied-patches against upstream into patches/\n";
     std::cout << "  --applied-patches <dir>       Path to applied-patches directory (default: applied-patches)\n";
@@ -85,6 +86,7 @@ int main(int argc, char* argv[]) {
     std::string custom_commandcenter;
     std::string custom_ai;
     std::string custom_vfs;
+    std::string custom_softscript;
     bool apply_patches_cmd = false;
     bool make_patches_cmd = false;
     std::string custom_umk;
@@ -142,6 +144,8 @@ int main(int argc, char* argv[]) {
             custom_ai = argv[++i];
         } else if (arg == "--vfs" && i + 1 < argc) {
             custom_vfs = argv[++i];
+        } else if (arg == "--softscript" && i + 1 < argc) {
+            custom_softscript = argv[++i];
         } else if (arg == "--apply-patches") {
             apply_patches_cmd = true;
         } else if (arg == "--make-patches") {
@@ -311,6 +315,15 @@ int main(int argc, char* argv[]) {
             assembly_roots.push_back(v_uppsrc);
         } else {
             assembly_roots.push_back(vfs_dir);
+        }
+    }
+    std::string softscript_dir = ResolveSiblingRepoPath("SoftScript", custom_softscript, repo_root);
+    if (!softscript_dir.empty() && softscript_dir != repo_root) {
+        std::string s_uppsrc = JoinPath(softscript_dir, "uppsrc");
+        if (DirectoryExists(s_uppsrc)) {
+            assembly_roots.push_back(s_uppsrc);
+        } else {
+            assembly_roots.push_back(softscript_dir);
         }
     }
     assembly_roots.push_back(JoinPath(repo_root, "uppsrc"));
