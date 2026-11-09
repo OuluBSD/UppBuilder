@@ -425,24 +425,44 @@ bool BridgeEngine::CreateCompatibilityShims(const std::string& target_uppsrc, bo
     // 1. CtrlCore shim
     std::string cc_dir = JoinPath(target_uppsrc, "CtrlCore");
     RealizeDirectory(cc_dir);
-    std::string cc_upp = "description \"Compatibility forwarding shim to Ctrl/Core\\377\";\n\nuses\n\tCtrl/Core;\n\nfile\n\tCtrlCore.h,\n\tlay.h;\n";
+    std::string src_cc = JoinPath(target_uppsrc, "Ctrl/Core");
+    std::string cc_upp = "description \"Compatibility forwarding shim to Ctrl/Core\\377\";\n\nuses\n\tCtrl/Core;\n\nfile\n";
+    if (DirectoryExists(src_cc)) {
+        for (const auto& item : ListDir(src_cc)) {
+            if (EndsWith(item, ".h")) {
+                cc_upp += "\t" + item + ",\n";
+                std::string shim_h = "#include <Ctrl/Core/" + item + ">\n";
+                WriteTextFile(JoinPath(cc_dir, item), shim_h);
+            }
+        }
+    }
+    if (EndsWith(cc_upp, ",\n")) {
+        cc_upp.pop_back();
+        cc_upp.back() = ';';
+        cc_upp += "\n";
+    }
     WriteTextFile(JoinPath(cc_dir, "CtrlCore.upp"), cc_upp);
-    std::string cc_h = "#ifndef _CtrlCore_CtrlCore_h_\n#define _CtrlCore_CtrlCore_h_\n\n// Forwarding shim to restructured Ctrl/Core\n#include <Ctrl/Core/CtrlCore.h>\n\n#endif\n";
-    WriteTextFile(JoinPath(cc_dir, "CtrlCore.h"), cc_h);
-    std::string cc_lay_h = "#include <Ctrl/Core/lay.h>\n";
-    WriteTextFile(JoinPath(cc_dir, "lay.h"), cc_lay_h);
 
     // 2. CtrlLib shim
     std::string cl_dir = JoinPath(target_uppsrc, "CtrlLib");
     RealizeDirectory(cl_dir);
-    std::string cl_upp = "description \"Compatibility forwarding shim to Ctrl/Lib\\377\";\n\nuses\n\tCtrl/Lib;\n\nfile\n\tCtrlLib.h,\n\tkey_header.h,\n\tkey_source.h;\n";
+    std::string src_cl = JoinPath(target_uppsrc, "Ctrl/Lib");
+    std::string cl_upp = "description \"Compatibility forwarding shim to Ctrl/Lib\\377\";\n\nuses\n\tCtrl/Lib;\n\nfile\n";
+    if (DirectoryExists(src_cl)) {
+        for (const auto& item : ListDir(src_cl)) {
+            if (EndsWith(item, ".h")) {
+                cl_upp += "\t" + item + ",\n";
+                std::string shim_h = "#include <Ctrl/Lib/" + item + ">\n";
+                WriteTextFile(JoinPath(cl_dir, item), shim_h);
+            }
+        }
+    }
+    if (EndsWith(cl_upp, ",\n")) {
+        cl_upp.pop_back();
+        cl_upp.back() = ';';
+        cl_upp += "\n";
+    }
     WriteTextFile(JoinPath(cl_dir, "CtrlLib.upp"), cl_upp);
-    std::string cl_h = "#ifndef _CtrlLib_CtrlLib_h_\n#define _CtrlLib_CtrlLib_h_\n\n// Forwarding shim to restructured Ctrl/Lib\n#include <Ctrl/Lib/CtrlLib.h>\n\n#endif\n";
-    WriteTextFile(JoinPath(cl_dir, "CtrlLib.h"), cl_h);
-    std::string cl_key_h = "#include <Ctrl/Lib/key_header.h>\n";
-    WriteTextFile(JoinPath(cl_dir, "key_header.h"), cl_key_h);
-    std::string cl_key_src = "#include <Ctrl/Lib/key_source.h>\n";
-    WriteTextFile(JoinPath(cl_dir, "key_source.h"), cl_key_src);
 
     if (verbose) {
         std::cout << "Created compatibility shims for CtrlCore and CtrlLib in " << target_uppsrc << "\n";
@@ -602,6 +622,10 @@ bool BridgeEngine::MaterializeAppliedPatches(const std::string& upstream_uppsrc,
             }
         }
     }
+
+    // 6. Post-patch pass: rewrite any unrewritten includes introduced by patches, and refresh shims
+    RewriteManifestsAndIncludes(applied_dir, verbose);
+    CreateCompatibilityShims(applied_dir, verbose);
 
     return true;
 }
