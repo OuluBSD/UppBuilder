@@ -336,7 +336,7 @@ bool BridgeEngine::ApplySinglePatch(const std::string& patch_path, const std::st
 
     std::stringstream cmd;
     // 1. Try patch tool
-    cmd << "patch --batch -N -p" << strip << " -d \"" << target_dir << "\" < \"" << patch_path << "\" > " << dev_null << " 2>&1";
+    cmd << "patch --batch -N --binary -p" << strip << " -d \"" << target_dir << "\" < \"" << patch_path << "\" > " << dev_null << " 2>&1";
     if (RunCommand(cmd.str()) == 0) {
         if (verbose) std::cout << "Successfully applied patch " << patch_path << " via patch tool\n";
         return true;
