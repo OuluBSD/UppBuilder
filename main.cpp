@@ -340,6 +340,12 @@ int main(int argc, char* argv[]) {
         }
     }
     assembly_roots.push_back(JoinPath(repo_root, "uppsrc"));
+    std::string ex_root = JoinPath(repo_root, "examples");
+    if (DirectoryExists(ex_root)) assembly_roots.push_back(ex_root);
+    std::string ref_root = JoinPath(repo_root, "reference");
+    if (DirectoryExists(ref_root)) assembly_roots.push_back(ref_root);
+    std::string tut_root = JoinPath(repo_root, "tutorial");
+    if (DirectoryExists(tut_root)) assembly_roots.push_back(tut_root);
     assembly_roots.push_back(JoinPath(repo_root, "upptst"));
     assembly_roots.push_back(JoinPath(repo_root, "src"));
     assembly_roots.push_back(repo_root);
