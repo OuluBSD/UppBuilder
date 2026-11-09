@@ -623,7 +623,16 @@ bool BridgeEngine::MaterializeAppliedPatches(const std::string& upstream_uppsrc,
         }
     }
 
-    // 6. Post-patch pass: rewrite any unrewritten includes introduced by patches, and refresh shims
+    // 6. Post-patch pass: sync restructured manifests, rewrite includes introduced by patches, and refresh shims
+    for (const auto& rule : restructure_rules_) {
+        std::string dst_pkg_dir = JoinPath(applied_dir, rule.staged_rel_path);
+        std::string orig_upp = JoinPath(dst_pkg_dir, rule.upstream_pkg + ".upp");
+        std::string new_upp = JoinPath(dst_pkg_dir, rule.staged_upp_name);
+        if (FileExists(orig_upp) && !rule.staged_upp_name.empty() && orig_upp != new_upp) {
+            CopyFile(orig_upp, new_upp);
+        }
+    }
+
     RewriteManifestsAndIncludes(applied_dir, verbose);
     CreateCompatibilityShims(applied_dir, verbose);
 
