@@ -335,26 +335,26 @@ bool BridgeEngine::ApplySinglePatch(const std::string& patch_path, const std::st
 #endif
 
     std::stringstream cmd;
-    // 1. Try patch tool
-    cmd << "patch --batch -N --binary -p" << strip << " -d \"" << target_dir << "\" < \"" << patch_path << "\" > " << dev_null << " 2>&1";
-    if (RunCommand(cmd.str()) == 0) {
-        if (verbose) std::cout << "Successfully applied patch " << patch_path << " via patch tool\n";
-        return true;
-    }
-
-    // 2. Try git apply with --unsafe-paths from inside target_dir
-    cmd.str("");
-    cmd << "cd \"" << target_dir << "\" && git apply --unsafe-paths --whitespace=nowarn -p" << strip << " \"" << patch_path << "\" > " << dev_null << " 2>&1";
+    // 1. Try git apply (atomic and CRLF-resilient with --ignore-whitespace) from inside target_dir
+    cmd << "cd \"" << target_dir << "\" && git apply --ignore-whitespace --unsafe-paths --whitespace=nowarn -p" << strip << " \"" << patch_path << "\" > " << dev_null << " 2>&1";
     if (RunCommand(cmd.str()) == 0) {
         if (verbose) std::cout << "Successfully applied patch " << patch_path << " via git apply (cd)\n";
         return true;
     }
 
-    // 3. Try git apply with --unsafe-paths and --directory
+    // 2. Try git apply with --directory
     cmd.str("");
-    cmd << "git apply --unsafe-paths --whitespace=nowarn --directory=\"" << target_dir << "\" -p" << strip << " \"" << patch_path << "\" > " << dev_null << " 2>&1";
+    cmd << "git apply --ignore-whitespace --unsafe-paths --whitespace=nowarn --directory=\"" << target_dir << "\" -p" << strip << " \"" << patch_path << "\" > " << dev_null << " 2>&1";
     if (RunCommand(cmd.str()) == 0) {
         if (verbose) std::cout << "Successfully applied patch " << patch_path << " via git apply\n";
+        return true;
+    }
+
+    // 3. Try patch tool
+    cmd.str("");
+    cmd << "patch --batch -N --binary -p" << strip << " -d \"" << target_dir << "\" < \"" << patch_path << "\" > " << dev_null << " 2>&1";
+    if (RunCommand(cmd.str()) == 0) {
+        if (verbose) std::cout << "Successfully applied patch " << patch_path << " via patch tool\n";
         return true;
     }
 
