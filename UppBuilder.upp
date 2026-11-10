@@ -20,6 +20,10 @@ file
 	RuntimeDeps.cpp,
 	FlagAuditor.h,
 	FlagAuditor.cpp,
+	UseModel.h,
+	UseModel.cpp,
+	PolicyEngine.h,
+	PolicyEngine.cpp,
 	main.cpp;
 
 mainconfig

@@ -13,6 +13,8 @@ set(SOURCES
     UmkDriver.cpp
     RuntimeDeps.cpp
     FlagAuditor.cpp
+    UseModel.cpp
+    PolicyEngine.cpp
     main.cpp
 )
 
@@ -25,6 +27,8 @@ set(HEADERS
     UmkDriver.h
     RuntimeDeps.h
     FlagAuditor.h
+    UseModel.h
+    PolicyEngine.h
 )
 
 add_executable(uppbuilder ${SOURCES} ${HEADERS})

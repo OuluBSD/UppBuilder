@@ -41,6 +41,14 @@ jobs:
         run: |
           ./uppbuilder --audit-flags examples/AuditTestPkg --audit-patch
 
+      - name: Test Portage USE Model & Policy Engine
+        run: |
+          ./uppbuilder explain-use sqlite
+          ./uppbuilder explain-use virtualgui
+          ./uppbuilder use examples/AuditTestPkg --use "+sqlite -gtk st"
+          ./uppbuilder use examples/PolicyTestPkg
+          ./uppbuilder use examples/PolicyTestPkg --use "+sqlite"
+
       - name: Test CMake Build
         run: |
           mkdir -p build && cd build
@@ -73,6 +81,15 @@ jobs:
         shell: cmd
         run: |
           uppbuilder.exe --audit-flags examples/AuditTestPkg --audit-patch
+
+      - name: Test Portage USE Model & Policy Engine
+        shell: cmd
+        run: |
+          uppbuilder.exe explain-use sqlite
+          uppbuilder.exe explain-use virtualgui
+          uppbuilder.exe use examples/AuditTestPkg --use "+sqlite -gtk st"
+          uppbuilder.exe use examples/PolicyTestPkg
+          uppbuilder.exe use examples/PolicyTestPkg --use "+sqlite"
 
       - name: Test CMake Build
         shell: cmd

@@ -6,6 +6,8 @@
 #include "UmkDriver.h"
 #include "RuntimeDeps.h"
 #include "FlagAuditor.h"
+#include "UseModel.h"
+#include "PolicyEngine.h"
 
 using namespace UppBuilder;
 
@@ -51,6 +53,11 @@ void PrintUsage(const char* prog) {
     std::cout << "  --report-headers <file.md>    Save header coupling analysis to markdown file\n";
     std::cout << "  --audit-flags [pkg]           Audit package acceptflags against source code usage\n";
     std::cout << "  --audit-patch                 Output suggested acceptflags patch with audit results\n\n";
+    std::cout << "Portage Package & USE Management:\n";
+    std::cout << "  --use \"<flags>\"               Specify USE flags (e.g. \"+sqlite -gtk st\")\n";
+    std::cout << "  use <pkg>                     Inspect resolved USE model and flag projections for package\n";
+    std::cout << "  explain-use [flag]            Explain semantic meaning and mappings of a USE flag\n";
+    std::cout << "  --policy-dir <dir>            Explicit path to .uppbuilder policy directory\n\n";
     std::cout << "General:\n";
     std::cout << "  -h, --help                    Show this help message\n";
     std::cout << "  --version                     Print version information\n";
@@ -83,6 +90,13 @@ int main(int argc, char* argv[]) {
     bool audit_flags = false;
     std::string audit_flags_pkg;
     bool audit_patch = false;
+
+    std::string cli_use;
+    bool show_use = false;
+    std::string show_use_pkg;
+    bool explain_use = false;
+    std::string explain_use_flag;
+    std::string custom_policy_dir;
 
     std::string staging_dir = ".uppbuilder/staging";
     std::string applied_patches_dir;
@@ -209,6 +223,20 @@ int main(int argc, char* argv[]) {
             }
         } else if (arg == "--audit-patch") {
             audit_patch = true;
+        } else if (arg == "--use" && i + 1 < argc) {
+            cli_use = argv[++i];
+        } else if (arg == "--show-use" || arg == "use") {
+            show_use = true;
+            if (i + 1 < argc && argv[i + 1][0] != '-') {
+                show_use_pkg = argv[++i];
+            }
+        } else if (arg == "explain-use" || arg == "--explain-use") {
+            explain_use = true;
+            if (i + 1 < argc && argv[i + 1][0] != '-') {
+                explain_use_flag = argv[++i];
+            }
+        } else if (arg == "--policy-dir" && i + 1 < argc) {
+            custom_policy_dir = argv[++i];
         } else if (arg == "-a" || arg == "--add-root") {
             if (i + 1 < argc) extra_roots.push_back(argv[++i]);
         } else if (arg[0] != '-') {
@@ -235,6 +263,31 @@ int main(int argc, char* argv[]) {
         } else if (DirectoryExists(JoinPath(GetParentDir(cwd), "uppsrc"))) {
             repo_root = GetParentDir(cwd);
         }
+    }
+
+    std::string policy_dir = !custom_policy_dir.empty() ? custom_policy_dir : PolicyEngine::FindPolicyDir(repo_root);
+    LocalPolicy local_policy;
+    if (!policy_dir.empty()) {
+        local_policy = PolicyEngine::LoadLocalPolicy(policy_dir);
+        if (jobs == 0 && local_policy.make_jobs > 0) {
+            jobs = local_policy.make_jobs;
+        }
+        if (method_pref.empty() && !local_policy.make_compiler.empty()) {
+            method_pref = local_policy.make_compiler;
+        }
+    }
+
+    if (explain_use) {
+        if (explain_use_flag.empty()) {
+            std::cout << "Available built-in USE flags:\n";
+            for (const auto& p : UseModelEngine::GetBuiltinPolicies()) {
+                std::cout << "  " << p.name << " - " << p.description << " ["
+                          << (p.default_on ? "default: on" : "default: off") << "]\n";
+            }
+            return 0;
+        }
+        std::cout << UseModelEngine::ExplainUse(explain_use_flag);
+        return 0;
     }
 
     std::string bazaarcore_dir = ResolveBazaarCorePath(custom_bazaarcore, repo_root);
@@ -466,6 +519,48 @@ int main(int argc, char* argv[]) {
         return 0;
     }
 
+    if (show_use) {
+        std::string inspect_pkg = !show_use_pkg.empty() ? show_use_pkg : target_pkg;
+        if (inspect_pkg.empty()) {
+            std::cerr << "Error: No package specified for USE inspection.\n";
+            return 1;
+        }
+        std::string resolved_inspect = bridge.ResolveRedirect(inspect_pkg);
+        DependencyGraph graph(bridge, assembly_roots);
+        std::string pkg_upp = graph.FindPackagePath(resolved_inspect);
+        if (pkg_upp.empty()) {
+            if (FileExists(inspect_pkg)) pkg_upp = GetAbsolutePath(inspect_pkg);
+            else if (FileExists(JoinPath(inspect_pkg, GetFileTitle(inspect_pkg) + ".upp"))) {
+                pkg_upp = GetAbsolutePath(JoinPath(inspect_pkg, GetFileTitle(inspect_pkg) + ".upp"));
+            }
+        }
+
+        UppPackage pkg_info;
+        bool has_pkg = !pkg_upp.empty() && UppParser::Parse(pkg_upp, pkg_info);
+
+        if (local_policy.policy_dir.empty() && !pkg_upp.empty()) {
+            std::string sub_policy = PolicyEngine::FindPolicyDir(GetParentDir(pkg_upp));
+            if (!sub_policy.empty()) {
+                local_policy = PolicyEngine::LoadLocalPolicy(sub_policy);
+            }
+        }
+
+        auto combined_use = PolicyEngine::CombineUseArgs(local_policy, inspect_pkg, cli_use);
+        auto forced = PolicyEngine::GetForcedFlags(local_policy, inspect_pkg);
+        auto masked = PolicyEngine::GetMaskedFlags(local_policy, inspect_pkg);
+
+        UseModel model = UseModelEngine::BuildUseModel(has_pkg ? &pkg_info : nullptr, combined_use, forced, masked);
+        UppProjection proj = UseModelEngine::ProjectUpp(model, has_pkg ? &pkg_info : nullptr);
+
+        std::cout << "Package: " << inspect_pkg << (has_pkg ? " (" + pkg_upp + ")" : " [not found on disk]") << "\n";
+        if (has_pkg && !pkg_info.acceptflags.empty()) {
+            std::cout << "Declared acceptflags: " << JoinStrings(pkg_info.acceptflags, ", ") << "\n";
+        }
+        std::cout << UseModelEngine::FormatUseModel(model);
+        std::cout << UseModelEngine::FormatProjection(proj);
+        return 0;
+    }
+
     if (target_pkg.empty()) {
         std::cerr << "Error: No target package specified.\n";
         PrintUsage(argv[0]);
@@ -535,6 +630,54 @@ int main(int argc, char* argv[]) {
         }
     } else if (has_pkg_info && !target_info.mainconfigs.empty()) {
         effective_flags = target_info.mainconfigs[0].flags;
+    }
+
+    if (local_policy.policy_dir.empty() && !pkg_upp.empty()) {
+        std::string sub_policy = PolicyEngine::FindPolicyDir(GetParentDir(pkg_upp));
+        if (!sub_policy.empty()) {
+            local_policy = PolicyEngine::LoadLocalPolicy(sub_policy);
+        }
+    }
+
+    // Portage USE Model & Policy Flag Projection
+    auto combined_use = PolicyEngine::CombineUseArgs(local_policy, target_pkg, cli_use);
+    auto forced_use = PolicyEngine::GetForcedFlags(local_policy, target_pkg);
+    auto masked_use = PolicyEngine::GetMaskedFlags(local_policy, target_pkg);
+
+    if (!combined_use.empty() || !forced_use.empty() || !masked_use.empty()) {
+        UseModel use_model = UseModelEngine::BuildUseModel(has_pkg_info ? &target_info : nullptr,
+                                                           combined_use, forced_use, masked_use);
+        UppProjection proj = UseModelEngine::ProjectUpp(use_model, has_pkg_info ? &target_info : nullptr);
+
+        if (verbose) {
+            std::cout << "==> UppBuilder: Applying Portage USE flags:\n";
+            std::cout << UseModelEngine::FormatUseModel(use_model);
+            std::cout << UseModelEngine::FormatProjection(proj);
+        }
+
+        // Apply disabled flags removal
+        std::set<std::string> current_flags = UppParser::ParseFlags(effective_flags);
+        for (const auto& dis : use_model.disabled) {
+            const UsePolicy* p = UseModelEngine::FindPolicy(dis);
+            if (p) {
+                for (const auto& m : p->maps_to) {
+                    current_flags.erase(ToUpper(m.upp_flag));
+                }
+            } else {
+                current_flags.erase(ToUpper(dis));
+            }
+        }
+
+        // Apply projected global and main-only flags
+        for (const auto& g : proj.global) {
+            current_flags.insert(g);
+        }
+        for (const auto& mo : proj.main_only) {
+            current_flags.insert(mo);
+        }
+
+        std::vector<std::string> flag_list(current_flags.begin(), current_flags.end());
+        effective_flags = JoinStrings(flag_list, " ");
     }
 
     // Deterministic configuration key (matching umk output structure)

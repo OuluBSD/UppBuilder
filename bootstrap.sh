@@ -28,6 +28,8 @@ echo "==> UppBuilder: Compiling standalone binary with ${CXX}..."
     UmkDriver.cpp \
     RuntimeDeps.cpp \
     FlagAuditor.cpp \
+    UseModel.cpp \
+    PolicyEngine.cpp \
     main.cpp \
     -lpthread \
     -o "${OUT_BIN}"

@@ -119,6 +119,20 @@ Audits source code flag usages (`#ifdef flagFLAG`, `#if defined(flagFLAG)`) agai
 ./uppbuilder --audit-flags Core --audit-patch
 ```
 
+### USE Flag Model & Policy Engine (Portage Phase 2)
+Provides semantic USE flag algebra, policy files (`.uppbuilder/make.conf`, `package.use`, `package.mask`, `package.force`), flag scopes (`global`, `accepted`, `main_only`), conflict detection, and target compilation flag projection:
+```bash
+# Explain a semantic USE flag:
+./uppbuilder explain-use sqlite
+./uppbuilder explain-use virtualgui
+
+# Inspect effective USE model and U++ flag projections for a package:
+./uppbuilder use examples/AuditTestPkg --use "+sqlite -gtk st"
+
+# Build applying USE flags:
+./uppbuilder TargetPackage --use "+sqlite +virtualgui"
+```
+
 ---
 
 ## 🚀 Quick Start & Building
@@ -187,6 +201,12 @@ Inspection & Graph Analysis:
   --report-headers <file.md>    Save header coupling analysis to markdown file
   --audit-flags [pkg]           Audit package acceptflags against source code usage
   --audit-patch                 Output suggested acceptflags patch with audit results
+
+Portage Package & USE Management:
+  --use "<flags>"               Specify USE flags (e.g. "+sqlite -gtk st")
+  use <pkg>                     Inspect resolved USE model and flag projections for package
+  explain-use [flag]            Explain semantic meaning and mappings of a USE flag
+  --policy-dir <dir>            Explicit path to .uppbuilder policy directory
 ```
 
 ---

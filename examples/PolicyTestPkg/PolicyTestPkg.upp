@@ -1,0 +1,12 @@
+description "Portage Policy Engine Test Package\n";
+
+acceptflags
+	FEATURE_A,
+	FEATURE_B,
+	SQLITE;
+
+file
+	PolicyTestPkg.cpp;
+
+mainconfig
+	"" = "";

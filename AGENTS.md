@@ -45,7 +45,9 @@ UppBootstrap  -->  UppBuilder  -->  BazaarCore  -->  Downstream Repos
 | **3-Pillar Bridge** | [`Bridge.h`](file:///home/sblo/Dev/UppBuilder/Bridge.h), [`Bridge.cpp`](file:///home/sblo/Dev/UppBuilder/Bridge.cpp) | Implements Package Redirection (`redirects.json`), File Overlays (`overlays.json`), and Surgical Patches (`patches/`). Materializes `patched-uppsrc` and staging workspaces. |
 | **Dependency Graph**| [`DepGraph.h`](file:///home/sblo/Dev/UppBuilder/DepGraph.h), [`DepGraph.cpp`](file:///home/sblo/Dev/UppBuilder/DepGraph.cpp) | Builds active package dependency DAGs, detects cycles, topological sorts, and exports to Mermaid, Graphviz DOT, or JSON. |
 | **Header Coupling** | [`HeaderScanner.h`](file:///home/sblo/Dev/UppBuilder/HeaderScanner.h), [`HeaderScanner.cpp`](file:///home/sblo/Dev/UppBuilder/HeaderScanner.cpp) | Scans `#include` directives across assemblies, maps headers to packages, identifies undeclared dependencies, and generates coupling markdown reports. |
-| **Flag Auditor** | [`FlagAuditor.h`](file:///home/sblo/Dev/UppBuilder/FlagAuditor.h), [`FlagAuditor.cpp`](file:///home/sblo/Dev/UppBuilder/FlagAuditor.cpp) | Portage-style package flag auditor: scans code flags (`flagFLAG`), compares against `.upp` `acceptflags`, identifies unaccepted code flags, and generates patches. |
+| **Flag Auditor** | [`FlagAuditor.h`](file:///home/sblo/OuluBSD/UppBuilder/FlagAuditor.h), [`FlagAuditor.cpp`](file:///home/sblo/OuluBSD/UppBuilder/FlagAuditor.cpp) | Portage-style package flag auditor: scans code flags (`flagFLAG`), compares against `.upp` `acceptflags`, identifies unaccepted code flags, and generates patches. |
+| **USE Model** | [`UseModel.h`](file:///home/sblo/OuluBSD/UppBuilder/UseModel.h), [`UseModel.cpp`](file:///home/sblo/OuluBSD/UppBuilder/UseModel.cpp) | Semantic USE flags, scopes (`global`, `accepted`, `main_only`), transitions, conflict detection, and compilation flag projection. |
+| **Policy Engine** | [`PolicyEngine.h`](file:///home/sblo/OuluBSD/UppBuilder/PolicyEngine.h), [`PolicyEngine.cpp`](file:///home/sblo/OuluBSD/UppBuilder/PolicyEngine.cpp) | Portage-style `.uppbuilder/` hierarchy parser (`make.conf`, `package.use`, `package.mask`, `package.force`). |
 | **Umk Driver** | [`UmkDriver.h`](file:///home/sblo/Dev/UppBuilder/UmkDriver.h), [`UmkDriver.cpp`](file:///home/sblo/Dev/UppBuilder/UmkDriver.cpp) | Discovers `umk`, scans `~/.config/u++/theide/*.bm` build methods, generates canonical config keys, and executes compilation jobs. |
 | **Runtime Harvester**| [`RuntimeDeps.h`](file:///home/sblo/Dev/UppBuilder/RuntimeDeps.h), [`RuntimeDeps.cpp`](file:///home/sblo/Dev/UppBuilder/RuntimeDeps.cpp) | Recursively scans ELF `DT_NEEDED`, PE import tables, or Mach-O `LC_LOAD_DYLIB` to bundle dynamic dependencies with `--copy-deps`. |
 | **Shared Utilities**| [`UppBuilder.h`](file:///home/sblo/Dev/UppBuilder/UppBuilder.h), [`UppBuilder.cpp`](file:///home/sblo/Dev/UppBuilder/UppBuilder.cpp) | Cross-platform filesystem helpers, string processing, child process spawning, and entrypoint creation. |
@@ -94,7 +96,24 @@ uppbuilder --graph mermaid TargetPackage
 uppbuilder --scan-headers Core --report-headers core-coupling-report.md
 ```
 
-### 3. Assembly Patching & Materialization
+### 3. Portage USE Management & Auditing
+```bash
+# Explain a semantic USE flag:
+uppbuilder explain-use sqlite
+uppbuilder explain-use virtualgui
+
+# Inspect effective USE model and U++ flag projections for a package:
+uppbuilder use TargetPackage --use "+sqlite -gtk st"
+
+# Audit package acceptflags against code usages:
+uppbuilder --audit-flags TargetPackage
+uppbuilder --audit-flags --audit-patch
+
+# Build package applying USE flags:
+uppbuilder TargetPackage --use "+sqlite +virtualgui"
+```
+
+### 4. Assembly Patching & Materialization
 ```bash
 # Materialize patched-uppsrc from pristine upstream ultimatepp + patches:
 uppbuilder --apply-patches --upstream ../ultimatepp/uppsrc --applied-patches ../BazaarCore/patched-uppsrc -v
