@@ -16,6 +16,15 @@ std::string DependencyGraph::FindPackagePath(const std::string& pkg_name) const 
     }
     std::string target_upp = file_title + ".upp";
 
+    // 0. Direct file or directory path check
+    if (FileExists(norm)) return GetAbsolutePath(norm);
+    if (DirectoryExists(norm)) {
+        std::string direct = JoinPath(norm, target_upp);
+        if (FileExists(direct)) return GetAbsolutePath(direct);
+        std::string cand_upp = norm + ".upp";
+        if (FileExists(cand_upp)) return GetAbsolutePath(cand_upp);
+    }
+
     // 1. Direct path check relative to search roots
     for (const auto& root : search_roots_) {
         std::string candidate = JoinPath(root, norm);

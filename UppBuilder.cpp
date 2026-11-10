@@ -206,6 +206,7 @@ std::vector<std::string> ListDir(const std::string& path) {
 
 void Walk(const std::string& path, std::vector<std::string>& files, const std::string& ext) {
     for (const auto& item : ListDir(path)) {
+        if (item.empty() || item[0] == '.' || item == "build" || item == "node_modules") continue;
         std::string full = JoinPath(path, item);
         if (DirectoryExists(full)) {
             Walk(full, files, ext);
@@ -385,11 +386,18 @@ std::string ResolveBazaarCorePath(const std::string& cli_override, const std::st
     }
 
     // Check adjacent/sibling directories
+    std::string home = GetEnvValue("HOME");
+    if (home.empty()) home = GetEnvValue("USERPROFILE");
+
     std::vector<std::string> candidates = {
         JoinPath(GetParentDir(repo_root), "BazaarCore"),
         JoinPath(GetParentDir(repo_root), "bazaarcore"),
         JoinPath(repo_root, "../BazaarCore")
     };
+    if (!home.empty()) {
+        candidates.push_back(JoinPath(JoinPath(home, "OuluBSD"), "BazaarCore"));
+        candidates.push_back(JoinPath(JoinPath(home, "Dev"), "BazaarCore"));
+    }
     for (const auto& c : candidates) {
         if (DirectoryExists(c) && DirectoryExists(JoinPath(c, "uppsrc"))) {
             return NormalizePath(c);
@@ -413,12 +421,20 @@ std::string ResolveSiblingRepoPath(const std::string& repo_name, const std::stri
     std::string lower_name = repo_name;
     for (char& ch : lower_name) ch = (char)::tolower((unsigned char)ch);
 
+    std::string home = GetEnvValue("HOME");
+    if (home.empty()) home = GetEnvValue("USERPROFILE");
+
     std::vector<std::string> candidates = {
         JoinPath(GetParentDir(repo_root), repo_name),
         JoinPath(GetParentDir(repo_root), lower_name),
         JoinPath(repo_root, "../" + repo_name),
         JoinPath(repo_root, "../" + lower_name)
     };
+    if (!home.empty()) {
+        candidates.push_back(JoinPath(JoinPath(home, "OuluBSD"), repo_name));
+        candidates.push_back(JoinPath(JoinPath(home, "OuluLinux"), repo_name));
+        candidates.push_back(JoinPath(JoinPath(home, "Dev"), repo_name));
+    }
     for (const auto& c : candidates) {
         if (DirectoryExists(c)) {
             return NormalizePath(c);
@@ -440,6 +456,13 @@ std::string ResolvePatchedUppsrcPath(const std::string& cli_override, const std:
     };
     for (const auto& c : local_candidates) {
         if (DirectoryExists(c)) return NormalizePath(c);
+    }
+
+    // Check BazaarCore location
+    std::string bazaarcore = ResolveBazaarCorePath("", repo_root);
+    if (!bazaarcore.empty()) {
+        std::string bc_patched = JoinPath(bazaarcore, "patched-uppsrc");
+        if (DirectoryExists(bc_patched)) return NormalizePath(bc_patched);
     }
 
     // Check global config file

@@ -262,6 +262,20 @@ int main(int argc, char* argv[]) {
             repo_root = cwd;
         } else if (DirectoryExists(JoinPath(GetParentDir(cwd), "uppsrc"))) {
             repo_root = GetParentDir(cwd);
+        } else {
+            std::string inspect_cand = !target_pkg.empty() ? target_pkg : (!show_use_pkg.empty() ? show_use_pkg : audit_flags_pkg);
+            if (!inspect_cand.empty() && (inspect_cand.find('/') != std::string::npos || inspect_cand.find('\\') != std::string::npos)) {
+                std::string t_search = GetAbsolutePath(inspect_cand);
+                while (!t_search.empty()) {
+                    if (DirectoryExists(JoinPath(t_search, ".git")) || DirectoryExists(JoinPath(t_search, "uppsrc"))) {
+                        repo_root = t_search;
+                        break;
+                    }
+                    std::string parent = GetParentDir(t_search);
+                    if (parent == t_search || parent.empty()) break;
+                    t_search = parent;
+                }
+            }
         }
     }
 
@@ -414,7 +428,9 @@ int main(int argc, char* argv[]) {
     if (DirectoryExists(tut_root)) assembly_roots.push_back(tut_root);
     assembly_roots.push_back(JoinPath(repo_root, "upptst"));
     assembly_roots.push_back(JoinPath(repo_root, "src"));
-    assembly_roots.push_back(repo_root);
+    if (DirectoryExists(JoinPath(repo_root, ".git")) || DirectoryExists(JoinPath(repo_root, "uppsrc"))) {
+        assembly_roots.push_back(repo_root);
+    }
     for (const auto& er : extra_roots) assembly_roots.push_back(er);
 
     UmkDriver umk_driver;
