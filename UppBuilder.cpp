@@ -75,7 +75,8 @@ std::string GetEnvValue(const char* name) {
 
 bool FileExists(const std::string& path) {
 #ifdef _WIN32
-    return _access(path.c_str(), 0) == 0;
+    DWORD dwAttrib = GetFileAttributesA(path.c_str());
+    return (dwAttrib != INVALID_FILE_ATTRIBUTES && !(dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
 #else
     struct stat st;
     return stat(path.c_str(), &st) == 0 && !S_ISDIR(st.st_mode);
