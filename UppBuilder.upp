@@ -24,6 +24,14 @@ file
 	UseModel.cpp,
 	PolicyEngine.h,
 	PolicyEngine.cpp,
+	EscBuildParser.h,
+	EscBuildParser.cpp,
+	ProfileManager.h,
+	ProfileManager.cpp,
+	ProviderPlanner.h,
+	ProviderPlanner.cpp,
+	OverlayManager.h,
+	OverlayManager.cpp,
 	main.cpp;
 
 mainconfig

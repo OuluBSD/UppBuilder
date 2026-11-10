@@ -133,6 +133,33 @@ Provides semantic USE flag algebra, policy files (`.uppbuilder/make.conf`, `pack
 ./uppbuilder TargetPackage --use "+sqlite +virtualgui"
 ```
 
+### Target Profiles & UppOverlay Catalog (Portage Phase 3)
+Supports Gentoo Portage-style target profiles and the central [`UppOverlay`](https://github.com/OuluBSD/UppOverlay) package catalog with U++ Esc-syntax `.escbuild` specifications:
+```bash
+# List available target profiles (NativeClang, NativeGcc, MsvcX64, WasmBrowser):
+./uppbuilder profile list
+
+# Show detailed profile configuration and build method:
+./uppbuilder profile show NativeClang
+
+# List all virtual capabilities:
+./uppbuilder virtual list
+
+# Resolve virtual package to host platform provider (vcpkg, apt, brew, internal plugin):
+./uppbuilder virtual resolve Virtual/Sqlite
+
+# List and inspect packages in the UppOverlay catalog:
+./uppbuilder overlay list
+./uppbuilder overlay info DevCpp/BazaarCore
+./uppbuilder overlay info DevUtil/UppBuilder
+
+# Synchronize overlay catalog:
+./uppbuilder overlay sync
+
+# Build with a specific target profile:
+./uppbuilder TargetPackage --profile NativeClang
+```
+
 ---
 
 ## 🚀 Quick Start & Building
@@ -207,6 +234,17 @@ Portage Package & USE Management:
   use <pkg>                     Inspect resolved USE model and flag projections for package
   explain-use [flag]            Explain semantic meaning and mappings of a USE flag
   --policy-dir <dir>            Explicit path to .uppbuilder policy directory
+
+Target Profiles & Portage Overlay:
+  --profile <name>              Select target profile (e.g. NativeClang, NativeGcc, MsvcX64, WasmBrowser)
+  profile list                  List all available target profiles
+  profile show [name]           Show configuration details for a target profile
+  virtual list                  List all virtual capability packages (Virtual/*)
+  virtual resolve <name>        Resolve virtual package to host provider (vcpkg, apt, brew, plugin)
+  overlay list                  List all packages indexed in UppOverlay
+  overlay info <atom>           Show package metadata from .escbuild file
+  overlay sync                  Pull latest updates from UppOverlay repository
+  --overlay-dir <dir>           Explicit path to UppOverlay repository
 ```
 
 ---

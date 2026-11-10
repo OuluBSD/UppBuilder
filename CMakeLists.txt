@@ -15,6 +15,10 @@ set(SOURCES
     FlagAuditor.cpp
     UseModel.cpp
     PolicyEngine.cpp
+    EscBuildParser.cpp
+    ProfileManager.cpp
+    ProviderPlanner.cpp
+    OverlayManager.cpp
     main.cpp
 )
 
@@ -29,6 +33,10 @@ set(HEADERS
     FlagAuditor.h
     UseModel.h
     PolicyEngine.h
+    EscBuildParser.h
+    ProfileManager.h
+    ProviderPlanner.h
+    OverlayManager.h
 )
 
 add_executable(uppbuilder ${SOURCES} ${HEADERS})

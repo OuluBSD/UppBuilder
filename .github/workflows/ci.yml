@@ -25,6 +25,12 @@ jobs:
       - name: Checkout UppBuilder
         uses: actions/checkout@v4
 
+      - name: Checkout UppOverlay Catalog
+        uses: actions/checkout@v4
+        with:
+          repository: OuluBSD/UppOverlay
+          path: ../UppOverlay
+
       - name: Compile with bootstrap.sh (${{ matrix.compiler }})
         env:
           CXX: ${{ matrix.compiler }}
@@ -49,6 +55,19 @@ jobs:
           ./uppbuilder use examples/PolicyTestPkg
           ./uppbuilder use examples/PolicyTestPkg --use "+sqlite"
 
+      - name: Test Target Profiles & UppOverlay Catalog
+        run: |
+          ./uppbuilder profile list
+          ./uppbuilder profile show NativeClang
+          ./uppbuilder virtual list
+          ./uppbuilder virtual resolve Virtual/Sqlite
+          ./uppbuilder virtual resolve Virtual/Png
+          ./uppbuilder overlay list
+          ./uppbuilder overlay info DevCpp/BazaarCore
+          ./uppbuilder overlay info DevUtil/UppBuilder
+          ./uppbuilder overlay info Virtual/Sqlite
+          ./uppbuilder --profile NativeClang --use "+debug" --show-use examples/PolicyTestPkg
+
       - name: Test CMake Build
         run: |
           mkdir -p build && cd build
@@ -62,6 +81,12 @@ jobs:
     steps:
       - name: Checkout UppBuilder
         uses: actions/checkout@v4
+
+      - name: Checkout UppOverlay Catalog
+        uses: actions/checkout@v4
+        with:
+          repository: OuluBSD/UppOverlay
+          path: ../UppOverlay
 
       - name: Setup MSVC Developer Command Prompt
         uses: ilammy/msvc-dev-cmd@v1
@@ -90,6 +115,20 @@ jobs:
           uppbuilder.exe use examples/AuditTestPkg --use "+sqlite -gtk st"
           uppbuilder.exe use examples/PolicyTestPkg
           uppbuilder.exe use examples/PolicyTestPkg --use "+sqlite"
+
+      - name: Test Target Profiles & UppOverlay Catalog
+        shell: cmd
+        run: |
+          uppbuilder.exe profile list
+          uppbuilder.exe profile show MsvcX64
+          uppbuilder.exe virtual list
+          uppbuilder.exe virtual resolve Virtual/Sqlite
+          uppbuilder.exe virtual resolve Virtual/Png
+          uppbuilder.exe overlay list
+          uppbuilder.exe overlay info DevCpp/BazaarCore
+          uppbuilder.exe overlay info DevUtil/UppBuilder
+          uppbuilder.exe overlay info Virtual/Sqlite
+          uppbuilder.exe --profile MsvcX64 --use "+debug" --show-use examples/PolicyTestPkg
 
       - name: Test CMake Build
         shell: cmd

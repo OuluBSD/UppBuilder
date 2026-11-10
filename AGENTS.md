@@ -48,6 +48,10 @@ UppBootstrap  -->  UppBuilder  -->  BazaarCore  -->  Downstream Repos
 | **Flag Auditor** | [`FlagAuditor.h`](file:///home/sblo/OuluBSD/UppBuilder/FlagAuditor.h), [`FlagAuditor.cpp`](file:///home/sblo/OuluBSD/UppBuilder/FlagAuditor.cpp) | Portage-style package flag auditor: scans code flags (`flagFLAG`), compares against `.upp` `acceptflags`, identifies unaccepted code flags, and generates patches. |
 | **USE Model** | [`UseModel.h`](file:///home/sblo/OuluBSD/UppBuilder/UseModel.h), [`UseModel.cpp`](file:///home/sblo/OuluBSD/UppBuilder/UseModel.cpp) | Semantic USE flags, scopes (`global`, `accepted`, `main_only`), transitions, conflict detection, and compilation flag projection. |
 | **Policy Engine** | [`PolicyEngine.h`](file:///home/sblo/OuluBSD/UppBuilder/PolicyEngine.h), [`PolicyEngine.cpp`](file:///home/sblo/OuluBSD/UppBuilder/PolicyEngine.cpp) | Portage-style `.uppbuilder/` hierarchy parser (`make.conf`, `package.use`, `package.mask`, `package.force`). |
+| **EscBuild Parser** | [`EscBuildParser.h`](file:///home/sblo/OuluBSD/UppBuilder/EscBuildParser.h), [`EscBuildParser.cpp`](file:///home/sblo/OuluBSD/UppBuilder/EscBuildParser.cpp) | U++ Esc-syntax parser extracting `.escbuild` metadata, functions (`src_unpack`, `src_compile`, `src_install`), providers, and dependencies. |
+| **Profile Manager** | [`ProfileManager.h`](file:///home/sblo/OuluBSD/UppBuilder/ProfileManager.h), [`ProfileManager.cpp`](file:///home/sblo/OuluBSD/UppBuilder/ProfileManager.cpp) | Target profile resolution (`NativeClang`, `NativeGcc`, `MsvcX64`, `WasmBrowser`), profile inheritance, and shared global build cache resolution (`~/.cache/upp.out`, `%LOCALAPPDATA%/u++/out`). |
+| **Provider Planner** | [`ProviderPlanner.h`](file:///home/sblo/OuluBSD/UppBuilder/ProviderPlanner.h), [`ProviderPlanner.cpp`](file:///home/sblo/OuluBSD/UppBuilder/ProviderPlanner.cpp) | Cross-platform capability resolver for `Virtual/*` dependencies (`vcpkg`, `apt-get`, `brew`, `plugin/*`). |
+| **Overlay Manager** | [`OverlayManager.h`](file:///home/sblo/OuluBSD/UppBuilder/OverlayManager.h), [`OverlayManager.cpp`](file:///home/sblo/OuluBSD/UppBuilder/OverlayManager.cpp) | Portage-style overlay discovery, package traversal across CapitalCase categories, package search, and git overlay synchronization. |
 | **Umk Driver** | [`UmkDriver.h`](file:///home/sblo/Dev/UppBuilder/UmkDriver.h), [`UmkDriver.cpp`](file:///home/sblo/Dev/UppBuilder/UmkDriver.cpp) | Discovers `umk`, scans `~/.config/u++/theide/*.bm` build methods, generates canonical config keys, and executes compilation jobs. |
 | **Runtime Harvester**| [`RuntimeDeps.h`](file:///home/sblo/Dev/UppBuilder/RuntimeDeps.h), [`RuntimeDeps.cpp`](file:///home/sblo/Dev/UppBuilder/RuntimeDeps.cpp) | Recursively scans ELF `DT_NEEDED`, PE import tables, or Mach-O `LC_LOAD_DYLIB` to bundle dynamic dependencies with `--copy-deps`. |
 | **Shared Utilities**| [`UppBuilder.h`](file:///home/sblo/Dev/UppBuilder/UppBuilder.h), [`UppBuilder.cpp`](file:///home/sblo/Dev/UppBuilder/UppBuilder.cpp) | Cross-platform filesystem helpers, string processing, child process spawning, and entrypoint creation. |
@@ -120,4 +124,29 @@ uppbuilder --apply-patches --upstream ../ultimatepp/uppsrc --applied-patches ../
 
 # Reverse-diff modified packages into surgical patch files:
 uppbuilder --make-patches --upstream ../ultimatepp/uppsrc --applied-patches ../BazaarCore/patched-uppsrc
+```
+
+### 5. Target Profiles & UppOverlay Catalog
+```bash
+# List all target profiles:
+uppbuilder profile list
+
+# Show detailed profile configuration:
+uppbuilder profile show NativeClang
+
+# List all virtual capability providers:
+uppbuilder virtual list
+
+# Resolve a virtual capability to host package manager command:
+uppbuilder virtual resolve Virtual/Sqlite
+
+# List all packages indexed in UppOverlay:
+uppbuilder overlay list
+
+# Inspect an overlay package from its .escbuild specification:
+uppbuilder overlay info DevCpp/BazaarCore
+uppbuilder overlay info DevUtil/UppBuilder
+
+# Build with a specific target profile (overriding method, USE flags, and cache):
+uppbuilder TargetPackage --profile NativeClang
 ```

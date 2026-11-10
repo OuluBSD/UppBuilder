@@ -30,6 +30,10 @@ echo "==> UppBuilder: Compiling standalone binary with ${CXX}..."
     FlagAuditor.cpp \
     UseModel.cpp \
     PolicyEngine.cpp \
+    EscBuildParser.cpp \
+    ProfileManager.cpp \
+    ProviderPlanner.cpp \
+    OverlayManager.cpp \
     main.cpp \
     -lpthread \
     -o "${OUT_BIN}"

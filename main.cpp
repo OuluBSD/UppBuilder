@@ -8,6 +8,10 @@
 #include "FlagAuditor.h"
 #include "UseModel.h"
 #include "PolicyEngine.h"
+#include "EscBuildParser.h"
+#include "ProfileManager.h"
+#include "ProviderPlanner.h"
+#include "OverlayManager.h"
 
 using namespace UppBuilder;
 
@@ -58,6 +62,16 @@ void PrintUsage(const char* prog) {
     std::cout << "  use <pkg>                     Inspect resolved USE model and flag projections for package\n";
     std::cout << "  explain-use [flag]            Explain semantic meaning and mappings of a USE flag\n";
     std::cout << "  --policy-dir <dir>            Explicit path to .uppbuilder policy directory\n\n";
+    std::cout << "Target Profiles & Portage Overlay:\n";
+    std::cout << "  --profile <name>              Select target profile (e.g. NativeClang, NativeGcc, MsvcX64, WasmBrowser)\n";
+    std::cout << "  profile list                  List all available target profiles\n";
+    std::cout << "  profile show [name]           Show configuration details for a target profile\n";
+    std::cout << "  virtual list                  List all virtual capability packages (Virtual/*)\n";
+    std::cout << "  virtual resolve <name>        Resolve virtual package to host provider (vcpkg, apt, brew, plugin)\n";
+    std::cout << "  overlay list                  List all packages indexed in UppOverlay\n";
+    std::cout << "  overlay info <atom>           Show package metadata from .escbuild file\n";
+    std::cout << "  overlay sync                  Pull latest updates from UppOverlay repository\n";
+    std::cout << "  --overlay-dir <dir>           Explicit path to UppOverlay repository\n\n";
     std::cout << "General:\n";
     std::cout << "  -h, --help                    Show this help message\n";
     std::cout << "  --version                     Print version information\n";
@@ -97,6 +111,21 @@ int main(int argc, char* argv[]) {
     bool explain_use = false;
     std::string explain_use_flag;
     std::string custom_policy_dir;
+
+    std::string selected_profile;
+    bool profile_list = false;
+    bool profile_show = false;
+    std::string profile_show_name;
+
+    bool virtual_list = false;
+    bool virtual_resolve = false;
+    std::string virtual_resolve_name;
+
+    bool overlay_list = false;
+    bool overlay_info = false;
+    std::string overlay_info_atom;
+    bool overlay_sync = false;
+    std::string custom_overlay_dir;
 
     std::string staging_dir = ".uppbuilder/staging";
     std::string applied_patches_dir;
@@ -237,6 +266,75 @@ int main(int argc, char* argv[]) {
             }
         } else if (arg == "--policy-dir" && i + 1 < argc) {
             custom_policy_dir = argv[++i];
+        } else if (arg == "profile") {
+            if (i + 1 < argc) {
+                std::string sub = argv[++i];
+                if (sub == "list") {
+                    profile_list = true;
+                } else if (sub == "show") {
+                    profile_show = true;
+                    if (i + 1 < argc && argv[i + 1][0] != '-') {
+                        profile_show_name = argv[++i];
+                    }
+                } else {
+                    selected_profile = sub;
+                }
+            } else {
+                profile_list = true;
+            }
+        } else if (arg == "--profile" && i + 1 < argc) {
+            selected_profile = argv[++i];
+        } else if (arg == "--list-profiles") {
+            profile_list = true;
+        } else if (arg == "--show-profile") {
+            profile_show = true;
+            if (i + 1 < argc && argv[i + 1][0] != '-') {
+                profile_show_name = argv[++i];
+            }
+        } else if (arg == "virtual") {
+            if (i + 1 < argc) {
+                std::string sub = argv[++i];
+                if (sub == "list") {
+                    virtual_list = true;
+                } else if (sub == "resolve") {
+                    virtual_resolve = true;
+                    if (i + 1 < argc && argv[i + 1][0] != '-') {
+                        virtual_resolve_name = argv[++i];
+                    }
+                }
+            } else {
+                virtual_list = true;
+            }
+        } else if (arg == "--list-virtuals") {
+            virtual_list = true;
+        } else if (arg == "--resolve-virtual" && i + 1 < argc) {
+            virtual_resolve = true;
+            virtual_resolve_name = argv[++i];
+        } else if (arg == "overlay") {
+            if (i + 1 < argc) {
+                std::string sub = argv[++i];
+                if (sub == "list") {
+                    overlay_list = true;
+                } else if (sub == "info") {
+                    overlay_info = true;
+                    if (i + 1 < argc && argv[i + 1][0] != '-') {
+                        overlay_info_atom = argv[++i];
+                    }
+                } else if (sub == "sync") {
+                    overlay_sync = true;
+                }
+            } else {
+                overlay_list = true;
+            }
+        } else if (arg == "--list-overlay" || arg == "--list-packages") {
+            overlay_list = true;
+        } else if (arg == "--overlay-info" && i + 1 < argc) {
+            overlay_info = true;
+            overlay_info_atom = argv[++i];
+        } else if (arg == "--overlay-sync") {
+            overlay_sync = true;
+        } else if (arg == "--overlay-dir" && i + 1 < argc) {
+            custom_overlay_dir = argv[++i];
         } else if (arg == "-a" || arg == "--add-root") {
             if (i + 1 < argc) extra_roots.push_back(argv[++i]);
         } else if (arg[0] != '-') {
@@ -302,6 +400,137 @@ int main(int argc, char* argv[]) {
         }
         std::cout << UseModelEngine::ExplainUse(explain_use_flag);
         return 0;
+    }
+
+    if (profile_list) {
+        auto profiles = ProfileManager::ListProfiles(custom_overlay_dir);
+        std::cout << "Available Target Profiles (" << profiles.size() << "):\n";
+        for (const auto& name : profiles) {
+            TargetProfile p = ProfileManager::LoadProfile(name, custom_overlay_dir);
+            std::cout << "  * " << p.name;
+            if (!p.build_method.empty()) std::cout << " (method: " << p.build_method << ")";
+            if (!p.default_use.empty()) std::cout << " [USE: " << p.default_use << "]";
+            std::cout << "\n";
+        }
+        return 0;
+    }
+
+    if (profile_show) {
+        std::string name = profile_show_name.empty() ? ProfileManager::GetDefaultProfileName() : profile_show_name;
+        TargetProfile p = ProfileManager::LoadProfile(name, custom_overlay_dir);
+        std::cout << "Profile:      " << p.name << "\n";
+        if (!p.path.empty()) {
+            std::cout << "Config Path:  " << p.path << "\n";
+        }
+        std::cout << "Build Method: " << (p.build_method.empty() ? "(none)" : p.build_method) << "\n";
+        std::cout << "Default USE:  " << (p.default_use.empty() ? "(none)" : p.default_use) << "\n";
+        std::cout << "Output Cache: " << (p.output_cache.empty() ? "(none)" : p.output_cache) << "\n";
+        if (!p.vars.empty()) {
+            std::cout << "make.conf variables:\n";
+            for (const auto& [k, v] : p.vars) {
+                std::cout << "  " << k << " = \"" << v << "\"\n";
+            }
+        }
+        return 0;
+    }
+
+    if (virtual_list) {
+        auto vlist = ProviderPlanner::ListVirtuals(custom_overlay_dir);
+        std::cout << "Available Virtual Packages (" << vlist.size() << "):\n";
+        for (const auto& v : vlist) {
+            std::cout << "  * " << v << "\n";
+        }
+        return 0;
+    }
+
+    if (virtual_resolve) {
+        if (virtual_resolve_name.empty()) {
+            std::cerr << "Error: No virtual package specified to resolve.\n";
+            return 1;
+        }
+        auto rp = ProviderPlanner::Resolve(virtual_resolve_name, custom_overlay_dir);
+        std::cout << "Virtual:        " << rp.virtual_name << "\n";
+        std::cout << "Provider Type:  " << rp.provider_type << "\n";
+        std::cout << "Package Ref:    " << rp.package_ref << "\n";
+        std::cout << "Install Cmd:    " << rp.command << "\n";
+        std::cout << "Host Available: " << (rp.is_available ? "yes" : "no") << "\n";
+        return 0;
+    }
+
+    if (overlay_list) {
+        auto pkgs = OverlayManager::ListAllPackages(custom_overlay_dir);
+        std::string root = OverlayManager::FindOverlayRoot(custom_overlay_dir);
+        std::cout << "UppOverlay Packages (" << pkgs.size() << ") at " << (root.empty() ? "[built-in]" : root) << ":\n";
+        for (const auto& pkg : pkgs) {
+            std::cout << "  * " << pkg.category << "/" << pkg.package_name;
+            if (!pkg.version.empty()) std::cout << "-" << pkg.version;
+            if (!pkg.description.empty()) std::cout << " - " << pkg.description;
+            std::cout << "\n";
+        }
+        return 0;
+    }
+
+    if (overlay_info) {
+        if (overlay_info_atom.empty()) {
+            std::cerr << "Error: No package atom specified for overlay info.\n";
+            return 1;
+        }
+        EscBuildInfo info;
+        if (!OverlayManager::FindPackage(overlay_info_atom, info, custom_overlay_dir)) {
+            std::cerr << "Error: Package '" << overlay_info_atom << "' not found in UppOverlay.\n";
+            return 1;
+        }
+        std::cout << "Package:      " << info.category << "/" << info.package_name << "\n";
+        std::cout << "Version:      " << info.version << "\n";
+        std::cout << "File:         " << info.file_path << "\n";
+        if (!info.description.empty()) std::cout << "Description:  " << info.description << "\n";
+        if (!info.homepage.empty())    std::cout << "Homepage:     " << info.homepage << "\n";
+        if (!info.git_repo.empty())    std::cout << "Git Repo:     " << info.git_repo << " (branch: " << info.git_branch << ")\n";
+        if (!info.upp_assembly.empty()) std::cout << "Assembly:     " << info.upp_assembly << "\n";
+        if (!info.default_package.empty()) std::cout << "Default Pkg:  " << info.default_package << "\n";
+        if (!info.iuse.empty())        std::cout << "IUSE:         " << JoinStrings(info.iuse, " ") << "\n";
+        if (!info.acceptflags.empty()) std::cout << "AcceptFlags:  " << JoinStrings(info.acceptflags, " ") << "\n";
+        if (!info.rdepend.empty())     std::cout << "RDEPEND:      " << JoinStrings(info.rdepend, " ") << "\n";
+        if (!info.providers.empty()) {
+            std::cout << "Providers:\n";
+            for (const auto& [plat, pkg] : info.providers) {
+                std::cout << "  " << plat << " -> " << pkg << "\n";
+            }
+        }
+        return 0;
+    }
+
+    if (overlay_sync) {
+        std::string root = OverlayManager::FindOverlayRoot(custom_overlay_dir);
+        if (root.empty()) {
+            std::cerr << "Error: UppOverlay directory not found.\n";
+            return 1;
+        }
+        std::cout << "==> UppBuilder: Synchronizing overlay at " << root << "...\n";
+        if (OverlayManager::SyncOverlay(root)) {
+            std::cout << "Overlay synchronization completed successfully.\n";
+            return 0;
+        } else {
+            std::cerr << "Error: Failed to sync overlay.\n";
+            return 1;
+        }
+    }
+
+    TargetProfile target_profile;
+    if (!selected_profile.empty()) {
+        target_profile = ProfileManager::LoadProfile(selected_profile, custom_overlay_dir);
+        if (method_pref.empty() && !target_profile.build_method.empty()) {
+            method_pref = target_profile.build_method;
+        }
+        if (!target_profile.default_use.empty()) {
+            if (cli_use.empty()) cli_use = target_profile.default_use;
+            else cli_use = target_profile.default_use + " " + cli_use;
+        }
+        if (verbose) {
+            std::cout << "==> UppBuilder: Target Profile: " << target_profile.name
+                      << " (method: " << target_profile.build_method
+                      << ", cache: " << target_profile.output_cache << ")\n";
+        }
     }
 
     std::string bazaarcore_dir = ResolveBazaarCorePath(custom_bazaarcore, repo_root);
