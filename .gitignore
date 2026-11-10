@@ -13,6 +13,7 @@ bin/
 out/
 .uppbuilder/
 .theide/
+UppOverlay/
 
 # System / IDE
 .DS_Store
