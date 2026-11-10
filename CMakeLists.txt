@@ -12,6 +12,7 @@ set(SOURCES
     HeaderScanner.cpp
     UmkDriver.cpp
     RuntimeDeps.cpp
+    FlagAuditor.cpp
     main.cpp
 )
 
@@ -23,6 +24,7 @@ set(HEADERS
     HeaderScanner.h
     UmkDriver.h
     RuntimeDeps.h
+    FlagAuditor.h
 )
 
 add_executable(uppbuilder ${SOURCES} ${HEADERS})

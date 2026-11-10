@@ -5,6 +5,7 @@
 #include "HeaderScanner.h"
 #include "UmkDriver.h"
 #include "RuntimeDeps.h"
+#include "FlagAuditor.h"
 
 using namespace UppBuilder;
 
@@ -47,7 +48,9 @@ void PrintUsage(const char* prog) {
     std::cout << "  --dump-deps <pkg>             Print resolved active dependency tree\n";
     std::cout << "  --graph <format>              Output dependency graph (mermaid, dot, json)\n";
     std::cout << "  --scan-headers [pkg]          Scan header inclusions and report inter-package coupling\n";
-    std::cout << "  --report-headers <file.md>    Save header coupling analysis to markdown file\n\n";
+    std::cout << "  --report-headers <file.md>    Save header coupling analysis to markdown file\n";
+    std::cout << "  --audit-flags [pkg]           Audit package acceptflags against source code usage\n";
+    std::cout << "  --audit-patch                 Output suggested acceptflags patch with audit results\n\n";
     std::cout << "General:\n";
     std::cout << "  -h, --help                    Show this help message\n";
     std::cout << "  --version                     Print version information\n";
@@ -77,6 +80,9 @@ int main(int argc, char* argv[]) {
     bool scan_headers = false;
     std::string scan_headers_focus;
     std::string report_headers_file;
+    bool audit_flags = false;
+    std::string audit_flags_pkg;
+    bool audit_patch = false;
 
     std::string staging_dir = ".uppbuilder/staging";
     std::string applied_patches_dir;
@@ -196,6 +202,13 @@ int main(int argc, char* argv[]) {
         } else if (arg == "--report-headers" && i + 1 < argc) {
             report_headers_file = argv[++i];
             scan_headers = true;
+        } else if (arg == "--audit-flags" || arg == "audit-flags") {
+            audit_flags = true;
+            if (i + 1 < argc && argv[i + 1][0] != '-') {
+                audit_flags_pkg = argv[++i];
+            }
+        } else if (arg == "--audit-patch") {
+            audit_patch = true;
         } else if (arg == "-a" || arg == "--add-root") {
             if (i + 1 < argc) extra_roots.push_back(argv[++i]);
         } else if (arg[0] != '-') {
@@ -372,6 +385,46 @@ int main(int argc, char* argv[]) {
             std::string md = scanner.GenerateMarkdownReport(scan_headers_focus);
             WriteTextFile(report_headers_file, md);
             std::cout << "Header coupling report written to: " << report_headers_file << "\n";
+        }
+        return 0;
+    }
+
+    if (audit_flags) {
+        std::cout << "==> UppBuilder: Auditing acceptflags against source code...\n";
+        DependencyGraph graph(bridge, assembly_roots);
+
+        std::string focus_pkg = !audit_flags_pkg.empty() ? audit_flags_pkg : target_pkg;
+        if (!focus_pkg.empty() && focus_pkg != "all" && focus_pkg != "--all") {
+            std::string upp_path = graph.FindPackagePath(focus_pkg);
+            if (upp_path.empty()) {
+                std::cerr << "Error: Package '" << focus_pkg << "' not found in assembly roots.\n";
+                return 1;
+            }
+            UppPackage pkg;
+            if (!UppParser::Parse(upp_path, pkg)) {
+                std::cerr << "Error: Failed to parse package: " << upp_path << "\n";
+                return 1;
+            }
+            std::string pkg_dir = GetParentDir(upp_path);
+            auto res = FlagAuditor::AuditPackage(pkg, pkg_dir);
+            FlagAuditor::PrintResult(res, audit_patch);
+        } else {
+            HeaderScanner scanner(assembly_roots);
+            scanner.IndexPackages();
+            int total = 0, warnings = 0, clean = 0, skipped = 0;
+            for (const auto& [name, profile] : scanner.GetProfiles()) {
+                UppPackage pkg;
+                if (!UppParser::Parse(profile.upp_path, pkg)) continue;
+                std::string pkg_dir = GetParentDir(profile.upp_path);
+                auto res = FlagAuditor::AuditPackage(pkg, pkg_dir);
+                FlagAuditor::PrintResult(res, audit_patch);
+                total++;
+                if (!res.missing_flags.empty()) warnings++;
+                else if (res.used_flags.empty()) skipped++;
+                else clean++;
+            }
+            std::cout << "\n==> Audit Summary: " << total << " packages audited ("
+                      << clean << " ok, " << warnings << " warnings, " << skipped << " skipped)\n";
         }
         return 0;
     }

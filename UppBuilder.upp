@@ -18,6 +18,8 @@ file
 	UmkDriver.cpp,
 	RuntimeDeps.h,
 	RuntimeDeps.cpp,
+	FlagAuditor.h,
+	FlagAuditor.cpp,
 	main.cpp;
 
 mainconfig

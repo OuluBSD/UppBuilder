@@ -1,0 +1,8 @@
+description "Test fixture for UppBuilder FlagAuditor\n";
+
+acceptflags
+	DECLARED_FLAG,
+	UNUSED_FLAG;
+
+file
+	AuditTestPkg.cpp;

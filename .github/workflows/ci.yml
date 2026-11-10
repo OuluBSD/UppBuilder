@@ -37,6 +37,10 @@ jobs:
           ./uppbuilder --version
           ./uppbuilder --help
 
+      - name: Test Flag Auditor
+        run: |
+          ./uppbuilder --audit-flags examples/AuditTestPkg --audit-patch
+
       - name: Test CMake Build
         run: |
           mkdir -p build && cd build
@@ -64,6 +68,11 @@ jobs:
         run: |
           uppbuilder.exe --version
           uppbuilder.exe --help
+
+      - name: Test Flag Auditor
+        shell: cmd
+        run: |
+          uppbuilder.exe --audit-flags examples/AuditTestPkg --audit-patch
 
       - name: Test CMake Build
         shell: cmd

@@ -168,7 +168,7 @@ bool UppParser::Parse(const std::string& upp_path, UppPackage& out_pkg) {
     out_pkg.name = GetFileTitle(upp_path);
 
     std::string line;
-    enum class UppSection { None, Uses, File, MainConfig, Include, Library, Link };
+    enum class UppSection { None, Uses, File, MainConfig, Include, Library, Link, AcceptFlags };
     UppSection current_sec = UppSection::None;
     std::string current_condition = "";
 
@@ -197,6 +197,17 @@ bool UppParser::Parse(const std::string& upp_path, UppPackage& out_pkg) {
                 out_pkg.target = trimmed.substr(q1 + 1, q2 - q1 - 1);
             }
             current_sec = UppSection::None;
+            continue;
+        }
+
+        if (StartsWith(trimmed, "acceptflags")) {
+            current_sec = UppSection::AcceptFlags;
+            std::string rest = Trim(trimmed.substr(11));
+            if (!rest.empty()) {
+                bool finished = false;
+                ParseCommaTokens(rest, out_pkg.acceptflags, finished);
+                if (finished) current_sec = UppSection::None;
+            }
             continue;
         }
 
@@ -302,6 +313,13 @@ bool UppParser::Parse(const std::string& upp_path, UppPackage& out_pkg) {
             } else {
                 out_pkg.conditional_uses.push_back({current_condition, pkgs});
             }
+            if (finished) current_sec = UppSection::None;
+            continue;
+        }
+
+        if (current_sec == UppSection::AcceptFlags) {
+            bool finished = false;
+            ParseCommaTokens(trimmed, out_pkg.acceptflags, finished);
             if (finished) current_sec = UppSection::None;
             continue;
         }

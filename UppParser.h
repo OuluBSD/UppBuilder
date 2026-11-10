@@ -17,6 +17,7 @@ struct UppPackage {
     std::vector<MainConfigEntry> mainconfigs;
     std::vector<std::string> unconditional_uses;
     std::vector<std::pair<std::string, std::vector<std::string>>> conditional_uses; // condition -> list of pkgs
+    std::vector<std::string> acceptflags;
     std::vector<std::string> files;
     std::vector<std::string> includes;
     std::vector<std::string> libraries;

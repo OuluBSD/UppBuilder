@@ -106,6 +106,19 @@ Scans `#include` statements across package files, maps each header to its owning
 ./uppbuilder --report-headers core-coupling.md
 ```
 
+### Package Flag Auditor (Portage Phase 1)
+Audits source code flag usages (`#ifdef flagFLAG`, `#if defined(flagFLAG)`) against package-level `acceptflags` declarations in `.upp` files. Identifies unaccepted code flags, unused acceptflags, and outputs unified diff patches:
+```bash
+# Audit a specific package:
+./uppbuilder --audit-flags Core
+
+# Audit all packages in assembly roots:
+./uppbuilder --audit-flags --all
+
+# Output suggested .upp patch:
+./uppbuilder --audit-flags Core --audit-patch
+```
+
 ---
 
 ## 🚀 Quick Start & Building
@@ -172,6 +185,8 @@ Inspection & Graph Analysis:
   --graph <format>              Output dependency graph (mermaid, dot, json)
   --scan-headers [pkg]          Scan header inclusions and report inter-package coupling
   --report-headers <file.md>    Save header coupling analysis to markdown file
+  --audit-flags [pkg]           Audit package acceptflags against source code usage
+  --audit-patch                 Output suggested acceptflags patch with audit results
 ```
 
 ---
