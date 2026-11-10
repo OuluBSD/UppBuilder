@@ -236,6 +236,10 @@ Portage Package & USE Management:
   --policy-dir <dir>            Explicit path to .uppbuilder policy directory
 
 Target Profiles & Portage Overlay:
+  emerge <atoms...>             Resolve dependencies and emerge packages
+  install <atoms...>            Alias for emerge
+  -p, --pretend                 Display merge plan without executing changes
+  -u, --update                  Update existing repository checkouts before build
   --profile <name>              Select target profile (e.g. NativeClang, NativeGcc, MsvcX64, WasmBrowser)
   profile list                  List all available target profiles
   profile show [name]           Show configuration details for a target profile

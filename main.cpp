@@ -12,6 +12,7 @@
 #include "ProfileManager.h"
 #include "ProviderPlanner.h"
 #include "OverlayManager.h"
+#include "EmergeEngine.h"
 
 using namespace UppBuilder;
 
@@ -63,6 +64,10 @@ void PrintUsage(const char* prog) {
     std::cout << "  explain-use [flag]            Explain semantic meaning and mappings of a USE flag\n";
     std::cout << "  --policy-dir <dir>            Explicit path to .uppbuilder policy directory\n\n";
     std::cout << "Target Profiles & Portage Overlay:\n";
+    std::cout << "  emerge <atoms...>             Resolve dependencies and emerge packages\n";
+    std::cout << "  install <atoms...>            Alias for emerge\n";
+    std::cout << "  -p, --pretend                 Display merge plan without executing changes\n";
+    std::cout << "  -u, --update                  Update existing repository checkouts before build\n";
     std::cout << "  --profile <name>              Select target profile (e.g. NativeClang, NativeGcc, MsvcX64, WasmBrowser)\n";
     std::cout << "  profile list                  List all available target profiles\n";
     std::cout << "  profile show [name]           Show configuration details for a target profile\n";
@@ -126,6 +131,11 @@ int main(int argc, char* argv[]) {
     std::string overlay_info_atom;
     bool overlay_sync = false;
     std::string custom_overlay_dir;
+
+    bool do_emerge = false;
+    bool emerge_pretend = false;
+    bool emerge_update = false;
+    std::vector<std::string> emerge_atoms;
 
     std::string staging_dir = ".uppbuilder/staging";
     std::string applied_patches_dir;
@@ -335,6 +345,15 @@ int main(int argc, char* argv[]) {
             overlay_sync = true;
         } else if (arg == "--overlay-dir" && i + 1 < argc) {
             custom_overlay_dir = argv[++i];
+        } else if (arg == "emerge" || arg == "install") {
+            do_emerge = true;
+            while (i + 1 < argc && argv[i + 1][0] != '-') {
+                emerge_atoms.push_back(argv[++i]);
+            }
+        } else if (arg == "-p" || arg == "--pretend") {
+            emerge_pretend = true;
+        } else if (arg == "-u" || arg == "--update") {
+            emerge_update = true;
         } else if (arg == "-a" || arg == "--add-root") {
             if (i + 1 < argc) extra_roots.push_back(argv[++i]);
         } else if (arg[0] != '-') {
@@ -514,6 +533,27 @@ int main(int argc, char* argv[]) {
             std::cerr << "Error: Failed to sync overlay.\n";
             return 1;
         }
+    }
+
+    if (do_emerge) {
+        if (emerge_atoms.empty()) {
+            std::cerr << "Error: No package atom(s) specified for emerge/install.\n";
+            return 1;
+        }
+        std::string profile = selected_profile.empty() ? ProfileManager::GetDefaultProfileName() : selected_profile;
+        EmergePlan plan;
+        if (!EmergeEngine::Plan(emerge_atoms, profile, plan, custom_overlay_dir)) {
+            std::cerr << "Error: " << plan.error << "\n";
+            return 1;
+        }
+        std::cout << EmergeEngine::FormatPlan(plan);
+        if (emerge_pretend) {
+            return 0;
+        }
+        if (!EmergeEngine::Execute(plan, emerge_update, verbose)) {
+            return 1;
+        }
+        return 0;
     }
 
     TargetProfile target_profile;

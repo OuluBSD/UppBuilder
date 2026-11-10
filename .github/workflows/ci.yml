@@ -68,6 +68,12 @@ jobs:
           ./uppbuilder overlay info Virtual/Sqlite
           ./uppbuilder --profile NativeClang --use "+debug" --show-use examples/PolicyTestPkg
 
+      - name: Test Emerge / Install Engine
+        run: |
+          ./uppbuilder emerge DevCpp/Eon -p
+          ./uppbuilder emerge AiAgents/SuperIntelligence -p
+          ./uppbuilder install MediaSound/SoftAudio --profile NativeClang -p
+
       - name: Test CMake Build
         run: |
           mkdir -p build && cd build
@@ -129,6 +135,13 @@ jobs:
           uppbuilder.exe overlay info DevUtil/UppBuilder
           uppbuilder.exe overlay info Virtual/Sqlite
           uppbuilder.exe --profile MsvcX64 --use "+debug" --show-use examples/PolicyTestPkg
+
+      - name: Test Emerge / Install Engine
+        shell: cmd
+        run: |
+          uppbuilder.exe emerge DevCpp/Eon -p
+          uppbuilder.exe emerge AiAgents/SuperIntelligence -p
+          uppbuilder.exe install MediaSound/SoftAudio --profile MsvcX64 -p
 
       - name: Test CMake Build
         shell: cmd

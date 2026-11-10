@@ -19,6 +19,7 @@ set(SOURCES
     ProfileManager.cpp
     ProviderPlanner.cpp
     OverlayManager.cpp
+    EmergeEngine.cpp
     main.cpp
 )
 
@@ -37,6 +38,7 @@ set(HEADERS
     ProfileManager.h
     ProviderPlanner.h
     OverlayManager.h
+    EmergeEngine.h
 )
 
 add_executable(uppbuilder ${SOURCES} ${HEADERS})

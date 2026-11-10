@@ -34,6 +34,7 @@ echo "==> UppBuilder: Compiling standalone binary with ${CXX}..."
     ProfileManager.cpp \
     ProviderPlanner.cpp \
     OverlayManager.cpp \
+    EmergeEngine.cpp \
     main.cpp \
     -lpthread \
     -o "${OUT_BIN}"

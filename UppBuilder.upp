@@ -32,6 +32,8 @@ file
 	ProviderPlanner.cpp,
 	OverlayManager.h,
 	OverlayManager.cpp,
+	EmergeEngine.h,
+	EmergeEngine.cpp,
 	main.cpp;
 
 mainconfig
