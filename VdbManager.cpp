@@ -1,9 +1,13 @@
 #include "VdbManager.h"
+#include "ProfileManager.h"
 #include "UppBuilder.h"
 #include <iostream>
 #include <fstream>
 #include <sstream>
 #include <chrono>
+#include <iomanip>
+#include <map>
+#include <set>
 #include <algorithm>
 #include <sys/stat.h>
 
@@ -112,37 +116,67 @@ static std::vector<std::string> ListSubdirs(const std::string& path) {
     return result;
 }
 
+static void EnsureProfileMigration(const std::string& base_vdb) {
+    std::string test_dir = JoinPath(base_vdb, "DevCpp");
+    if (DirectoryExists(test_dir)) {
+        std::string target_profile_dir = JoinPath(base_vdb, "NativeClang");
+        RealizeDirectory(target_profile_dir);
+        for (const auto& item : ListDir(base_vdb)) {
+            if (item == "." || item == ".." || item == "NativeClang" || item == "NativeGcc" || item == "MsvcX64" || item == "WasmBrowser") continue;
+            std::string src = JoinPath(base_vdb, item);
+            if (DirectoryExists(src)) {
+                std::string dst = JoinPath(target_profile_dir, item);
+                rename(src.c_str(), dst.c_str());
+            }
+        }
+    }
+}
+
 } // namespace
 
-std::string VdbManager::GetVdbDir(const std::string& custom_dir) {
-    if (!custom_dir.empty()) return custom_dir;
-
-    const char* env_dir = getenv("UPPBUILDER_VDB_DIR");
-    if (env_dir && *env_dir) return env_dir;
-
+std::string VdbManager::GetVdbDir(const std::string& custom_dir, const std::string& profile) {
+    std::string base;
+    if (!custom_dir.empty()) {
+        base = custom_dir;
+    } else {
+        const char* env_dir = getenv("UPPBUILDER_VDB_DIR");
+        if (env_dir && *env_dir) {
+            base = env_dir;
+        } else {
 #ifdef _WIN32
-    const char* appdata = getenv("APPDATA");
-    if (appdata && *appdata) {
-        return std::string(appdata) + "\\uppbuilder\\vdb";
-    }
-    return "C:\\uppbuilder\\vdb";
+            const char* appdata = getenv("APPDATA");
+            if (appdata && *appdata) {
+                base = std::string(appdata) + "\\uppbuilder\\vdb";
+            } else {
+                base = "C:\\uppbuilder\\vdb";
+            }
 #else
-    const char* xdg_config = getenv("XDG_CONFIG_HOME");
-    if (xdg_config && *xdg_config) {
-        return std::string(xdg_config) + "/uppbuilder/vdb";
-    }
-    const char* home = getenv("HOME");
-    if (home && *home) {
-        return std::string(home) + "/.config/uppbuilder/vdb";
-    }
-    return "/var/db/uppbuilder/vdb";
+            const char* xdg_config = getenv("XDG_CONFIG_HOME");
+            if (xdg_config && *xdg_config) {
+                base = std::string(xdg_config) + "/uppbuilder/vdb";
+            } else {
+                const char* home = getenv("HOME");
+                if (home && *home) {
+                    base = std::string(home) + "/.config/uppbuilder/vdb";
+                } else {
+                    base = "/var/db/uppbuilder/vdb";
+                }
+            }
 #endif
+        }
+    }
+
+    EnsureProfileMigration(base);
+
+    std::string prof = profile.empty() ? ProfileManager::GetActiveProfileName() : profile;
+    return JoinPath(base, prof);
 }
 
 bool VdbManager::RegisterPackage(const VdbEntry& entry, const std::string& custom_dir) {
     if (entry.atom.empty()) return false;
 
-    std::string vdb_root = GetVdbDir(custom_dir);
+    std::string prof = entry.profile.empty() ? ProfileManager::GetActiveProfileName() : entry.profile;
+    std::string vdb_root = GetVdbDir(custom_dir, prof);
     std::string cat = "sys";
     std::string pkg = entry.atom;
     size_t slash = entry.atom.find('/');
@@ -154,12 +188,12 @@ bool VdbManager::RegisterPackage(const VdbEntry& entry, const std::string& custo
     std::string pf = pkg;
     if (!entry.version.empty()) pf += "-" + entry.version;
 
-    std::string pkg_dir = vdb_root + "/" + cat + "/" + pf;
+    std::string pkg_dir = JoinPath(JoinPath(vdb_root, cat), pf);
     MkdirP(pkg_dir);
 
     WriteFileString(pkg_dir + "/ATOM", entry.atom);
     WriteFileString(pkg_dir + "/VERSION", entry.version.empty() ? "0.1.0" : entry.version);
-    WriteFileString(pkg_dir + "/PROFILE", entry.profile);
+    WriteFileString(pkg_dir + "/PROFILE", prof);
     WriteFileString(pkg_dir + "/USE", entry.use);
     WriteFileString(pkg_dir + "/REPO", entry.repo_path);
     WriteFileString(pkg_dir + "/TARGET", entry.target);
@@ -177,8 +211,8 @@ bool VdbManager::RegisterPackage(const VdbEntry& entry, const std::string& custo
     return true;
 }
 
-bool VdbManager::UnregisterPackage(const std::string& atom, const std::string& custom_dir) {
-    std::string vdb_root = GetVdbDir(custom_dir);
+bool VdbManager::UnregisterPackage(const std::string& atom, const std::string& custom_dir, const std::string& profile) {
+    std::string vdb_root = GetVdbDir(custom_dir, profile);
     std::string cat = "sys";
     std::string pkg = atom;
     size_t slash = atom.find('/');
@@ -187,19 +221,19 @@ bool VdbManager::UnregisterPackage(const std::string& atom, const std::string& c
         pkg = atom.substr(slash + 1);
     }
 
-    std::string cat_dir = vdb_root + "/" + cat;
+    std::string cat_dir = JoinPath(vdb_root, cat);
     auto dirs = ListSubdirs(cat_dir);
     for (const auto& d : dirs) {
         if (d == pkg || d.rfind(pkg + "-", 0) == 0) {
-            std::string full_dir = cat_dir + "/" + d;
+            std::string full_dir = JoinPath(cat_dir, d);
             return RemoveDirectoryRecursive(full_dir);
         }
     }
     return false;
 }
 
-bool VdbManager::IsInstalled(const std::string& atom, VdbEntry* out_entry, const std::string& custom_dir) {
-    std::string vdb_root = GetVdbDir(custom_dir);
+bool VdbManager::IsInstalled(const std::string& atom, VdbEntry* out_entry, const std::string& custom_dir, const std::string& profile) {
+    std::string vdb_root = GetVdbDir(custom_dir, profile);
     std::string cat = "sys";
     std::string pkg = atom;
     size_t slash = atom.find('/');
@@ -208,12 +242,12 @@ bool VdbManager::IsInstalled(const std::string& atom, VdbEntry* out_entry, const
         pkg = atom.substr(slash + 1);
     }
 
-    std::string cat_dir = vdb_root + "/" + cat;
+    std::string cat_dir = JoinPath(vdb_root, cat);
     auto dirs = ListSubdirs(cat_dir);
     for (const auto& d : dirs) {
         if (d == pkg || d.rfind(pkg + "-", 0) == 0) {
             if (out_entry) {
-                std::string pkg_dir = cat_dir + "/" + d;
+                std::string pkg_dir = JoinPath(cat_dir, d);
                 out_entry->atom = ReadFileString(pkg_dir + "/ATOM");
                 if (out_entry->atom.empty()) out_entry->atom = cat + "/" + pkg;
                 out_entry->version = ReadFileString(pkg_dir + "/VERSION");
@@ -232,15 +266,15 @@ bool VdbManager::IsInstalled(const std::string& atom, VdbEntry* out_entry, const
     return false;
 }
 
-std::vector<VdbEntry> VdbManager::ListInstalled(const std::string& custom_dir) {
+std::vector<VdbEntry> VdbManager::ListInstalled(const std::string& custom_dir, const std::string& profile) {
     std::vector<VdbEntry> result;
-    std::string vdb_root = GetVdbDir(custom_dir);
+    std::string vdb_root = GetVdbDir(custom_dir, profile);
     auto cats = ListSubdirs(vdb_root);
     for (const auto& cat : cats) {
-        std::string cat_dir = vdb_root + "/" + cat;
+        std::string cat_dir = JoinPath(vdb_root, cat);
         auto pkgs = ListSubdirs(cat_dir);
         for (const auto& pf : pkgs) {
-            std::string pkg_dir = cat_dir + "/" + pf;
+            std::string pkg_dir = JoinPath(cat_dir, pf);
             VdbEntry entry;
             entry.atom = ReadFileString(pkg_dir + "/ATOM");
             if (entry.atom.empty()) {
@@ -264,9 +298,40 @@ std::vector<VdbEntry> VdbManager::ListInstalled(const std::string& custom_dir) {
     return result;
 }
 
-std::vector<std::string> VdbManager::FindReverseDependencies(const std::string& atom, const std::string& custom_dir) {
+std::vector<std::string> VdbManager::ListVdbProfiles(const std::string& custom_dir) {
+    std::string base;
+    if (!custom_dir.empty()) {
+        base = custom_dir;
+    } else {
+        const char* env_dir = getenv("UPPBUILDER_VDB_DIR");
+        if (env_dir && *env_dir) base = env_dir;
+        else {
+#ifdef _WIN32
+            const char* appdata = getenv("APPDATA");
+            if (appdata && *appdata) base = std::string(appdata) + "\\uppbuilder\\vdb";
+            else base = "C:\\uppbuilder\\vdb";
+#else
+            const char* xdg_config = getenv("XDG_CONFIG_HOME");
+            if (xdg_config && *xdg_config) base = std::string(xdg_config) + "/uppbuilder/vdb";
+            else {
+                const char* home = getenv("HOME");
+                if (home && *home) base = std::string(home) + "/.config/uppbuilder/vdb";
+                else base = "/var/db/uppbuilder/vdb";
+            }
+#endif
+        }
+    }
+    EnsureProfileMigration(base);
+    std::vector<std::string> profiles;
+    for (const auto& item : ListSubdirs(base)) {
+        if (item != "." && item != "..") profiles.push_back(item);
+    }
+    return profiles;
+}
+
+std::vector<std::string> VdbManager::FindReverseDependencies(const std::string& atom, const std::string& custom_dir, const std::string& profile) {
     std::vector<std::string> rev_deps;
-    auto all = ListInstalled(custom_dir);
+    auto all = ListInstalled(custom_dir, profile);
     for (const auto& pkg : all) {
         if (pkg.atom == atom) continue;
         for (const auto& dep : pkg.rdepend) {
@@ -277,6 +342,39 @@ std::vector<std::string> VdbManager::FindReverseDependencies(const std::string& 
         }
     }
     return rev_deps;
+}
+
+bool VdbManager::DiffProfiles(const std::string& profile1, const std::string& profile2, const std::string& custom_dir) {
+    auto list1 = ListInstalled(custom_dir, profile1);
+    auto list2 = ListInstalled(custom_dir, profile2);
+
+    std::map<std::string, std::pair<std::string, std::string>> all_atoms;
+    for (const auto& e : list1) {
+        all_atoms[e.atom].first = e.version.empty() ? "0.1.0" : e.version;
+    }
+    for (const auto& e : list2) {
+        all_atoms[e.atom].second = e.version.empty() ? "0.1.0" : e.version;
+    }
+
+    std::cout << "\nComparing VDB installations: " << profile1 << " vs " << profile2 << "\n";
+    std::cout << std::string(70, '-') << "\n";
+    std::cout << std::left << std::setw(35) << "Package Atom"
+              << std::setw(18) << profile1
+              << std::setw(18) << profile2 << "\n";
+    std::cout << std::string(70, '-') << "\n";
+
+    int diff_count = 0;
+    for (const auto& kv : all_atoms) {
+        std::string v1 = kv.second.first.empty() ? "(none)" : kv.second.first;
+        std::string v2 = kv.second.second.empty() ? "(none)" : kv.second.second;
+        if (v1 != v2) diff_count++;
+        std::cout << std::left << std::setw(35) << kv.first
+                  << std::setw(18) << v1
+                  << std::setw(18) << v2 << "\n";
+    }
+    std::cout << std::string(70, '-') << "\n";
+    std::cout << "Total packages: " << all_atoms.size() << " (" << diff_count << " difference(s))\n\n";
+    return true;
 }
 
 } // namespace UppBuilder

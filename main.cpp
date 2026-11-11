@@ -75,8 +75,12 @@ void PrintUsage(const char* prog) {
     std::cout << "  -u, --update                  Update existing repository checkouts before build\n";
     std::cout << "  vdb list                      List installed packages in VDB database\n";
     std::cout << "  vdb info <atom>               Show installed package details from VDB database\n";
+    std::cout << "  vdb diff <p1> <p2>            Compare installed packages between two profiles\n";
+    std::cout << "  vdb profiles                  List all profiles with installed packages in VDB\n";
     std::cout << "  --profile <name>              Select target profile (e.g. NativeClang, NativeGcc, MsvcX64, WasmBrowser)\n";
     std::cout << "  profile list                  List all available target profiles\n";
+    std::cout << "  profile active                Show currently active target profile\n";
+    std::cout << "  profile switch <name>         Switch default active target profile\n";
     std::cout << "  profile show [name]           Show configuration details for a target profile\n";
     std::cout << "  virtual list                  List all virtual capability packages (Virtual/*)\n";
     std::cout << "  virtual resolve <name>        Resolve virtual package to host provider (vcpkg, apt, brew, plugin)\n";
@@ -126,6 +130,9 @@ int main(int argc, char* argv[]) {
 
     std::string selected_profile;
     bool profile_list = false;
+    bool profile_active = false;
+    bool profile_switch = false;
+    std::string profile_switch_name;
     bool profile_show = false;
     std::string profile_show_name;
 
@@ -155,6 +162,9 @@ int main(int argc, char* argv[]) {
     bool vdb_list = false;
     bool vdb_info = false;
     std::string vdb_info_atom;
+    bool vdb_profiles = false;
+    bool vdb_diff = false;
+    std::string vdb_diff_p1, vdb_diff_p2;
 
     std::string staging_dir = ".uppbuilder/staging";
     std::string applied_patches_dir;
@@ -300,6 +310,11 @@ int main(int argc, char* argv[]) {
                 std::string sub = argv[++i];
                 if (sub == "list") {
                     profile_list = true;
+                } else if (sub == "active") {
+                    profile_active = true;
+                } else if (sub == "switch" && i + 1 < argc) {
+                    profile_switch = true;
+                    profile_switch_name = argv[++i];
                 } else if (sub == "show") {
                     profile_show = true;
                     if (i + 1 < argc && argv[i + 1][0] != '-') {
@@ -388,6 +403,12 @@ int main(int argc, char* argv[]) {
                 std::string sub = argv[++i];
                 if (sub == "list") {
                     vdb_list = true;
+                } else if (sub == "profiles") {
+                    vdb_profiles = true;
+                } else if (sub == "diff" && i + 2 < argc) {
+                    vdb_diff = true;
+                    vdb_diff_p1 = argv[++i];
+                    vdb_diff_p2 = argv[++i];
                 } else if (sub == "info" && i + 1 < argc) {
                     vdb_info = true;
                     vdb_info_atom = argv[++i];
@@ -464,12 +485,36 @@ int main(int argc, char* argv[]) {
         return 0;
     }
 
+    if (profile_active) {
+        std::cout << "Active Target Profile: " << ProfileManager::GetActiveProfileName(custom_overlay_dir) << "\n";
+        return 0;
+    }
+
+    if (profile_switch) {
+        if (profile_switch_name.empty()) {
+            std::cerr << "Error: No target profile specified to switch to.\n";
+            return 1;
+        }
+        if (ProfileManager::SetActiveProfileName(profile_switch_name)) {
+            std::cout << ">>> Switched active profile to: " << profile_switch_name << "\n";
+            return 0;
+        } else {
+            std::cerr << "Error: Failed to set active profile.\n";
+            return 1;
+        }
+    }
+
     if (profile_list) {
+        std::string active_prof = ProfileManager::GetActiveProfileName(custom_overlay_dir);
         auto profiles = ProfileManager::ListProfiles(custom_overlay_dir);
         std::cout << "Available Target Profiles (" << profiles.size() << "):\n";
         for (const auto& name : profiles) {
             TargetProfile p = ProfileManager::LoadProfile(name, custom_overlay_dir);
-            std::cout << "  * " << p.name;
+            if (name == active_prof) {
+                std::cout << "  * " << p.name << " (active)";
+            } else {
+                std::cout << "    " << p.name;
+            }
             if (!p.build_method.empty()) std::cout << " (method: " << p.build_method << ")";
             if (!p.default_use.empty()) std::cout << " [USE: " << p.default_use << "]";
             std::cout << "\n";
@@ -583,7 +628,7 @@ int main(int argc, char* argv[]) {
             std::cerr << "Error: No package atom(s) specified for emerge/install.\n";
             return 1;
         }
-        std::string profile = selected_profile.empty() ? ProfileManager::GetDefaultProfileName() : selected_profile;
+        std::string profile = selected_profile.empty() ? ProfileManager::GetActiveProfileName() : selected_profile;
         EmergePlan plan;
         if (!EmergeEngine::Plan(emerge_atoms, profile, plan, custom_overlay_dir)) {
             std::cerr << "Error: " << plan.error << "\n";
@@ -599,9 +644,24 @@ int main(int argc, char* argv[]) {
         return 0;
     }
 
+    if (vdb_diff) {
+        return VdbManager::DiffProfiles(vdb_diff_p1, vdb_diff_p2) ? 0 : 1;
+    }
+
+    if (vdb_profiles) {
+        auto profs = VdbManager::ListVdbProfiles();
+        std::string active = ProfileManager::GetActiveProfileName();
+        std::cout << "Target Profiles with VDB Installations (" << profs.size() << "):\n";
+        for (const auto& p : profs) {
+            std::cout << "  " << (p == active ? "* " : "  ") << p << "\n";
+        }
+        return 0;
+    }
+
     if (vdb_list) {
-        auto installed = VdbManager::ListInstalled();
-        std::cout << "Installed Packages in VDB (" << installed.size() << "):\n";
+        std::string prof = selected_profile.empty() ? ProfileManager::GetActiveProfileName() : selected_profile;
+        auto installed = VdbManager::ListInstalled("", prof);
+        std::cout << "Installed Packages in VDB [" << prof << "] (" << installed.size() << "):\n";
         for (const auto& pkg : installed) {
             std::cout << "  * " << pkg.atom;
             if (!pkg.version.empty()) std::cout << "-" << pkg.version;
@@ -614,8 +674,9 @@ int main(int argc, char* argv[]) {
 
     if (vdb_info) {
         VdbEntry entry;
-        if (!VdbManager::IsInstalled(vdb_info_atom, &entry)) {
-            std::cerr << "Package '" << vdb_info_atom << "' is not installed in VDB.\n";
+        std::string prof = selected_profile.empty() ? ProfileManager::GetActiveProfileName() : selected_profile;
+        if (!VdbManager::IsInstalled(vdb_info_atom, &entry, "", prof)) {
+            std::cerr << "Package '" << vdb_info_atom << "' is not installed in VDB [" << prof << "].\n";
             return 1;
         }
         std::cout << "Package:      " << entry.atom << "\n";

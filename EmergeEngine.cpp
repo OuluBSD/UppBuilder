@@ -51,7 +51,7 @@ bool EmergeEngine::Plan(const std::vector<std::string>& atoms,
                         EmergePlan& out_plan,
                         const std::string& overlay_root)
 {
-    out_plan.profile_name = profile_name.empty() ? ProfileManager::GetDefaultProfileName() : profile_name;
+    out_plan.profile_name = profile_name.empty() ? ProfileManager::GetActiveProfileName(overlay_root) : profile_name;
     out_plan.profile = ProfileManager::LoadProfile(out_plan.profile_name, overlay_root);
 
     std::set<std::string> visited;

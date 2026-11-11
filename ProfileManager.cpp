@@ -21,6 +21,23 @@ std::string ProfileManager::GetDefaultProfileName() {
 #endif
 }
 
+std::string ProfileManager::GetActiveProfileName(const std::string& overlay_path) {
+    std::string config_dir = GetUserConfigDir();
+    std::string active_file = JoinPath(config_dir, "active_profile");
+    if (FileExists(active_file)) {
+        std::string p = Trim(ReadTextFile(active_file));
+        if (!p.empty()) return p;
+    }
+    return GetDefaultProfileName();
+}
+
+bool ProfileManager::SetActiveProfileName(const std::string& profile_name) {
+    std::string config_dir = GetUserConfigDir();
+    RealizeDirectory(config_dir);
+    std::string active_file = JoinPath(config_dir, "active_profile");
+    return WriteTextFile(active_file, profile_name + "\n");
+}
+
 std::string ProfileManager::GetDefaultOutputCache() {
 #ifdef _WIN32
     std::string local_app_data = GetEnvValue("LOCALAPPDATA");

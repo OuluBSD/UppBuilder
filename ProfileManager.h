@@ -21,6 +21,12 @@ public:
     // Resolves default profile name based on host OS and available compiler
     static std::string GetDefaultProfileName();
 
+    // Resolves active profile (from ~/.config/uppbuilder/active_profile or default)
+    static std::string GetActiveProfileName(const std::string& overlay_path = "");
+
+    // Sets active profile name in configuration
+    static bool SetActiveProfileName(const std::string& profile_name);
+
     // Resolves default shared global cache path (~/.cache/upp.out or %LOCALAPPDATA%/u++/out)
     static std::string GetDefaultOutputCache();
 

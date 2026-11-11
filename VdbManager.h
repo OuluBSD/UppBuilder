@@ -21,23 +21,29 @@ struct VdbEntry {
 
 class VdbManager {
 public:
-    // Returns root directory of VDB: ~/.config/uppbuilder/vdb (or custom via UPBUILDER_VDB_DIR)
-    static std::string GetVdbDir(const std::string& custom_dir = "");
+    // Returns root directory of VDB for a given profile
+    static std::string GetVdbDir(const std::string& custom_dir = "", const std::string& profile = "");
 
     // Registers or updates an installed package entry
     static bool RegisterPackage(const VdbEntry& entry, const std::string& custom_dir = "");
 
     // Unregisters a package entry
-    static bool UnregisterPackage(const std::string& atom, const std::string& custom_dir = "");
+    static bool UnregisterPackage(const std::string& atom, const std::string& custom_dir = "", const std::string& profile = "");
 
     // Checks if a package is installed
-    static bool IsInstalled(const std::string& atom, VdbEntry* out_entry = nullptr, const std::string& custom_dir = "");
+    static bool IsInstalled(const std::string& atom, VdbEntry* out_entry = nullptr, const std::string& custom_dir = "", const std::string& profile = "");
 
-    // Lists all installed packages
-    static std::vector<VdbEntry> ListInstalled(const std::string& custom_dir = "");
+    // Lists all installed packages for a profile
+    static std::vector<VdbEntry> ListInstalled(const std::string& custom_dir = "", const std::string& profile = "");
+
+    // Lists all profiles that currently have VDB entries
+    static std::vector<std::string> ListVdbProfiles(const std::string& custom_dir = "");
 
     // Finds which installed packages depend on the specified atom
-    static std::vector<std::string> FindReverseDependencies(const std::string& atom, const std::string& custom_dir = "");
+    static std::vector<std::string> FindReverseDependencies(const std::string& atom, const std::string& custom_dir = "", const std::string& profile = "");
+
+    // Compares two profiles and prints diff
+    static bool DiffProfiles(const std::string& profile1, const std::string& profile2, const std::string& custom_dir = "");
 };
 
 } // namespace UppBuilder
