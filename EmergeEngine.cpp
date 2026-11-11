@@ -610,6 +610,24 @@ bool EmergeEngine::RunTests(const std::vector<std::string>& atoms,
             for (const auto& p : pkgs) {
                 target_atoms.push_back("upptst/" + p);
             }
+        } else if (a == "@reference") {
+            std::string ref_dir = JoinPath(bc, "applied-reference");
+            auto pkgs = DiscoverAssemblyPackages(ref_dir);
+            for (const auto& p : pkgs) {
+                target_atoms.push_back("reference/" + p);
+            }
+        } else if (a == "@tutorial") {
+            std::string tut_dir = JoinPath(bc, "applied-tutorial");
+            auto pkgs = DiscoverAssemblyPackages(tut_dir);
+            for (const auto& p : pkgs) {
+                target_atoms.push_back("tutorial/" + p);
+            }
+        } else if (a == "@examples") {
+            std::string ex_dir = JoinPath(bc, "applied-examples");
+            auto pkgs = DiscoverAssemblyPackages(ex_dir);
+            for (const auto& p : pkgs) {
+                target_atoms.push_back("examples/" + p);
+            }
         } else {
             target_atoms.push_back(a);
         }
@@ -629,8 +647,10 @@ bool EmergeEngine::RunTests(const std::vector<std::string>& atoms,
     out_summary.results.clear();
 
     for (const auto& atom : target_atoms) {
-        // Handle upstream assembly test packages (autotest/*, upptst/*)
-        if (StartsWith(atom, "autotest/") || StartsWith(atom, "upptst/")) {
+        // Handle upstream assembly test packages (autotest/*, upptst/*, reference/*, tutorial/*, examples/*)
+        if (StartsWith(atom, "autotest/") || StartsWith(atom, "upptst/") ||
+            StartsWith(atom, "reference/") || StartsWith(atom, "tutorial/") ||
+            StartsWith(atom, "examples/")) {
             size_t slash = atom.find('/');
             std::string prefix = atom.substr(0, slash);
             std::string pkg_name = atom.substr(slash + 1);
@@ -704,6 +724,14 @@ bool EmergeEngine::RunTests(const std::vector<std::string>& atoms,
                 res.success = true;
                 res.message = "PASS";
                 std::cout << "  [PASS] " << atom << " (" << ms << "ms)\n";
+            } else if (output.find("Failed to initialized GTK app") != std::string::npos ||
+                       output.find("Cannot open display") != std::string::npos ||
+                       output.find("cannot open display") != std::string::npos ||
+                       output.find("No protocol specified") != std::string::npos) {
+                out_summary.skipped++;
+                res.success = true;
+                res.message = "SKIPPED (GUI requires DISPLAY)";
+                std::cout << "  [SKIP] " << atom << " (" << ms << "ms): " << res.message << "\n";
             } else {
                 out_summary.failed++;
                 res.success = false;

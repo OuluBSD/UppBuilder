@@ -71,7 +71,7 @@ void PrintUsage(const char* prog) {
     std::cout << "Target Profiles & Portage Overlay:\n";
     std::cout << "  emerge <atoms...>             Resolve dependencies and emerge packages\n";
     std::cout << "  install <atoms...>            Alias for emerge\n";
-    std::cout << "  test [atoms...]               Run test suites for packages (default: @installed)\n";
+    std::cout << "  test [atoms...]               Run test suites for packages (@installed, @autotest, @upptst, @reference, @tutorial, @examples)\n";
     std::cout << "  --test                        Run test suites after emerging packages\n";
     std::cout << "  unmerge <atoms...>            Unmerge package and remove artifacts\n";
     std::cout << "  --force                       Force unmerge ignoring reverse dependencies\n";

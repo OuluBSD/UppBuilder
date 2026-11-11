@@ -76,7 +76,7 @@ public:
                         bool force = false,
                         bool verbose = false);
 
-    // Executes tests for specified atoms, @installed, @all, @autotest, or @upptst
+    // Executes tests for specified atoms, @installed, @all, @autotest, @upptst, @reference, @tutorial, or @examples
     static bool RunTests(const std::vector<std::string>& atoms,
                          TestSummary& out_summary,
                          bool verbose = false,
