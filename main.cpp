@@ -717,6 +717,9 @@ int main(int argc, char* argv[]) {
         return 0;
     }
 
+    std::string bazaarcore_dir = ResolveBazaarCorePath(custom_bazaarcore, repo_root);
+    std::string base_for_patches = !bazaarcore_dir.empty() ? bazaarcore_dir : repo_root;
+
     if (do_unmerge) {
         return EmergeEngine::Unmerge(unmerge_atoms, unmerge_force, verbose) ? 0 : 1;
     }
@@ -726,7 +729,7 @@ int main(int argc, char* argv[]) {
             test_atoms.push_back("@installed");
         }
         TestSummary summary;
-        bool ok = EmergeEngine::RunTests(test_atoms, summary, verbose, custom_overlay_dir);
+        bool ok = EmergeEngine::RunTests(test_atoms, summary, verbose, custom_overlay_dir, base_for_patches);
         return ok ? 0 : 1;
     }
 
@@ -746,9 +749,6 @@ int main(int argc, char* argv[]) {
                       << ", cache: " << target_profile.output_cache << ")\n";
         }
     }
-
-    std::string bazaarcore_dir = ResolveBazaarCorePath(custom_bazaarcore, repo_root);
-    std::string base_for_patches = !bazaarcore_dir.empty() ? bazaarcore_dir : repo_root;
 
     std::string upstream_dir_resolved = ResolveUpstreamPath(upstream_dir, base_for_patches);
     std::string full_applied = ResolvePatchedUppsrcPath(applied_patches_dir, base_for_patches);

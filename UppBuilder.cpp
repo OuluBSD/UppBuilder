@@ -1,4 +1,7 @@
 #include "UppBuilder.h"
+#ifndef _WIN32
+#include <sys/wait.h>
+#endif
 
 namespace UppBuilder {
 
@@ -306,23 +309,28 @@ int RunCommand(const std::string& cmd) {
     return ret;
 }
 
-std::string CaptureCommand(const std::string& cmd) {
+std::string CaptureCommand(const std::string& cmd, int* out_exit_code) {
     std::string result;
 #ifdef _WIN32
     FILE* fp = _popen(cmd.c_str(), "r");
 #else
     FILE* fp = popen(cmd.c_str(), "r");
 #endif
-    if (!fp) return "";
+    if (!fp) {
+        if (out_exit_code) *out_exit_code = -1;
+        return "";
+    }
     char buf[512];
     while (fgets(buf, sizeof(buf), fp)) {
         result += buf;
     }
 #ifdef _WIN32
-    _pclose(fp);
+    int status = _pclose(fp);
 #else
-    pclose(fp);
+    int status = pclose(fp);
+    if (WIFEXITED(status)) status = WEXITSTATUS(status);
 #endif
+    if (out_exit_code) *out_exit_code = status;
     return result;
 }
 

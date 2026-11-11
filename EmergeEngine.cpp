@@ -515,23 +515,69 @@ bool EmergeEngine::ExecuteSingleTest(const EscBuildInfo& info,
     return true;
 }
 
+static std::vector<std::string> DiscoverAssemblyPackages(const std::string& assembly_dir) {
+    std::vector<std::string> pkgs;
+    if (!DirectoryExists(assembly_dir)) return pkgs;
+
+#if defined(__has_include) && __has_include(<filesystem>)
+    try {
+        for (const auto& entry : fs::directory_iterator(assembly_dir)) {
+            if (entry.is_directory()) {
+                std::string pkg_name = entry.path().filename().string();
+                if (pkg_name.empty() || pkg_name[0] == '.') continue;
+                std::string upp_file = JoinPath(entry.path().string(), pkg_name + ".upp");
+                if (FileExists(upp_file)) {
+                    pkgs.push_back(pkg_name);
+                }
+            }
+        }
+    } catch (...) {}
+#endif
+    std::sort(pkgs.begin(), pkgs.end());
+    return pkgs;
+}
+
 bool EmergeEngine::RunTests(const std::vector<std::string>& atoms,
                             TestSummary& out_summary,
                             bool verbose,
-                            const std::string& overlay_root)
+                            const std::string& overlay_root,
+                            const std::string& bazaarcore_root)
 {
-    std::vector<std::string> target_atoms = atoms;
-    if (target_atoms.empty() || (target_atoms.size() == 1 && target_atoms[0] == "@installed")) {
-        target_atoms.clear();
-        auto installed = VdbManager::ListInstalled();
-        for (const auto& entry : installed) {
-            target_atoms.push_back(entry.atom);
+    std::string bc = bazaarcore_root;
+    if (bc.empty()) {
+        std::string home = GetEnvValue("HOME");
+        if (!home.empty()) {
+            if (DirectoryExists(JoinPath(home, "OuluBSD/BazaarCore"))) bc = JoinPath(home, "OuluBSD/BazaarCore");
+            else if (DirectoryExists(JoinPath(home, "Dev/BazaarCore"))) bc = JoinPath(home, "Dev/BazaarCore");
         }
-    } else if (target_atoms.size() == 1 && target_atoms[0] == "@all") {
-        target_atoms.clear();
-        auto all_pkgs = OverlayManager::ListAllPackages(overlay_root);
-        for (const auto& pkg : all_pkgs) {
-            target_atoms.push_back(pkg.category + "/" + pkg.package_name);
+    }
+
+    std::vector<std::string> target_atoms;
+    for (const auto& a : atoms) {
+        if (a == "@installed" || (atoms.size() == 1 && atoms[0].empty())) {
+            auto installed = VdbManager::ListInstalled();
+            for (const auto& entry : installed) {
+                target_atoms.push_back(entry.atom);
+            }
+        } else if (a == "@all") {
+            auto all_pkgs = OverlayManager::ListAllPackages(overlay_root);
+            for (const auto& pkg : all_pkgs) {
+                target_atoms.push_back(pkg.category + "/" + pkg.package_name);
+            }
+        } else if (a == "@autotest") {
+            std::string autotest_dir = JoinPath(bc, "applied-autotest");
+            auto pkgs = DiscoverAssemblyPackages(autotest_dir);
+            for (const auto& p : pkgs) {
+                target_atoms.push_back("autotest/" + p);
+            }
+        } else if (a == "@upptst") {
+            std::string upptst_dir = JoinPath(bc, "applied-upptst");
+            auto pkgs = DiscoverAssemblyPackages(upptst_dir);
+            for (const auto& p : pkgs) {
+                target_atoms.push_back("upptst/" + p);
+            }
+        } else {
+            target_atoms.push_back(a);
         }
     }
 
@@ -549,6 +595,100 @@ bool EmergeEngine::RunTests(const std::vector<std::string>& atoms,
     out_summary.results.clear();
 
     for (const auto& atom : target_atoms) {
+        // Handle upstream assembly test packages (autotest/*, upptst/*)
+        if (StartsWith(atom, "autotest/") || StartsWith(atom, "upptst/")) {
+            size_t slash = atom.find('/');
+            std::string prefix = atom.substr(0, slash);
+            std::string pkg_name = atom.substr(slash + 1);
+
+            // 1. Build test target via uppbuilder
+            std::string bcmd;
+#ifdef _WIN32
+            bcmd = "uppbuilder.exe " + atom;
+#else
+            bcmd = "uppbuilder " + atom;
+#endif
+            if (verbose) std::cout << ">>> Building upstream test: " << bcmd << "\n";
+            int b_ret = RunCommand(bcmd + (verbose ? "" : " >/dev/null 2>&1"));
+            if (b_ret != 0) {
+                out_summary.failed++;
+                TestResult res;
+                res.atom = atom;
+                res.suite = pkg_name;
+                res.success = false;
+                res.duration_ms = 0;
+                res.message = "Build failed (exit code " + std::to_string(b_ret) + ")";
+                out_summary.results.push_back(res);
+                std::cout << "  [FAIL] " << atom << " (0ms): " << res.message << "\n";
+                continue;
+            }
+
+            // 2. Locate built executable
+            std::string bin_path;
+            std::string local_bin = JoinPath("bin", pkg_name);
+            if (FileExists(local_bin)) bin_path = local_bin;
+            else if (FileExists(local_bin + ".exe")) bin_path = local_bin + ".exe";
+            else if (!bc.empty()) {
+                std::string bc_bin = JoinPath(JoinPath(bc, "bin"), pkg_name);
+                if (FileExists(bc_bin)) bin_path = bc_bin;
+                else if (FileExists(bc_bin + ".exe")) bin_path = bc_bin + ".exe";
+            }
+            if (bin_path.empty()) {
+                bin_path = FindBinaryInRepo(".", pkg_name);
+                if (bin_path.empty() && !bc.empty()) bin_path = FindBinaryInRepo(bc, pkg_name);
+            }
+
+            if (bin_path.empty()) {
+                out_summary.failed++;
+                TestResult res;
+                res.atom = atom;
+                res.suite = pkg_name;
+                res.success = false;
+                res.duration_ms = 0;
+                res.message = "Test executable '" + pkg_name + "' not found";
+                out_summary.results.push_back(res);
+                std::cout << "  [FAIL] " << atom << " (0ms): " << res.message << "\n";
+                continue;
+            }
+
+            // 3. Execute test binary and record metrics
+            std::string run_cmd = "\"" + bin_path + "\"";
+            auto t0 = std::chrono::steady_clock::now();
+            int run_exit = 0;
+            std::string output = CaptureCommand(run_cmd + " 2>&1", &run_exit);
+            auto t1 = std::chrono::steady_clock::now();
+            long ms = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
+            grand_total_ms += ms;
+
+            TestResult res;
+            res.atom = atom;
+            res.suite = pkg_name;
+            res.duration_ms = ms;
+
+            if (run_exit == 0) {
+                out_summary.passed++;
+                res.success = true;
+                res.message = "PASS";
+                std::cout << "  [PASS] " << atom << " (" << ms << "ms)\n";
+            } else {
+                out_summary.failed++;
+                res.success = false;
+                res.message = "Process exited with code " + std::to_string(run_exit);
+                std::cout << "  [FAIL] " << atom << " (" << ms << "ms): " << res.message << "\n";
+                if (!output.empty()) {
+                    std::cout << "    Output:\n";
+                    std::istringstream oss(output);
+                    std::string line;
+                    int lcnt = 0;
+                    while (std::getline(oss, line) && lcnt++ < 10) {
+                        std::cout << "      " << line << "\n";
+                    }
+                }
+            }
+            out_summary.results.push_back(res);
+            continue;
+        }
+
         EscBuildInfo info;
         if (!OverlayManager::FindPackage(atom, info, overlay_root)) {
             if (verbose) std::cout << "--- " << atom << ": .escbuild definition not found.\n";

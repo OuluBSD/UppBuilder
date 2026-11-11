@@ -87,7 +87,7 @@ bool CreateEntrypoint(const std::string& technical_binary,
                       const std::string& entrypoint_path,
                       const std::string& relative_target);
 int RunCommand(const std::string& cmd);
-std::string CaptureCommand(const std::string& cmd);
+std::string CaptureCommand(const std::string& cmd, int* out_exit_code = nullptr);
 
 // User configuration and cache directories
 std::string GetUserConfigDir();

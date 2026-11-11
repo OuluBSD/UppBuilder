@@ -71,11 +71,12 @@ public:
                         bool force = false,
                         bool verbose = false);
 
-    // Executes tests for specified atoms or @installed
+    // Executes tests for specified atoms, @installed, @all, @autotest, or @upptst
     static bool RunTests(const std::vector<std::string>& atoms,
                          TestSummary& out_summary,
                          bool verbose = false,
-                         const std::string& overlay_root = "");
+                         const std::string& overlay_root = "",
+                         const std::string& bazaarcore_root = "");
 
     // Executes test for a single package given its EscBuildInfo and repo directory
     static bool ExecuteSingleTest(const EscBuildInfo& info,
