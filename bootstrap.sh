@@ -37,6 +37,7 @@ echo "==> UppBuilder: Compiling standalone binary with ${CXX}..."
     EmergeEngine.cpp \
     VdbManager.cpp \
     BinPkgManager.cpp \
+    WatchEngine.cpp \
     main.cpp \
     -lpthread \
     -o "${OUT_BIN}"

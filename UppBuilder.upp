@@ -37,6 +37,10 @@ file
 	EmergeEngine.cpp,
 	VdbManager.h,
 	VdbManager.cpp,
+	BinPkgManager.h,
+	BinPkgManager.cpp,
+	WatchEngine.h,
+	WatchEngine.cpp,
 	main.cpp;
 
 mainconfig

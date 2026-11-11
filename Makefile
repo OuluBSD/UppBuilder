@@ -2,7 +2,7 @@ CXX ?= g++
 CXXFLAGS ?= -std=c++17 -O2 -Wall
 LDFLAGS ?= -lpthread
 
-SOURCES = UppBuilder.cpp Bridge.cpp UppParser.cpp DepGraph.cpp HeaderScanner.cpp UmkDriver.cpp RuntimeDeps.cpp FlagAuditor.cpp UseModel.cpp PolicyEngine.cpp EscBuildParser.cpp ProfileManager.cpp ProviderPlanner.cpp OverlayManager.cpp EmergeEngine.cpp VdbManager.cpp main.cpp
+SOURCES = UppBuilder.cpp Bridge.cpp UppParser.cpp DepGraph.cpp HeaderScanner.cpp UmkDriver.cpp RuntimeDeps.cpp FlagAuditor.cpp UseModel.cpp PolicyEngine.cpp EscBuildParser.cpp ProfileManager.cpp ProviderPlanner.cpp OverlayManager.cpp EmergeEngine.cpp VdbManager.cpp BinPkgManager.cpp WatchEngine.cpp main.cpp
 OBJECTS = $(SOURCES:.cpp=.o)
 TARGET = uppbuilder
 

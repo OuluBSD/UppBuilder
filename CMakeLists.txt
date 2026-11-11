@@ -22,6 +22,7 @@ set(SOURCES
     EmergeEngine.cpp
     VdbManager.cpp
     BinPkgManager.cpp
+    WatchEngine.cpp
     main.cpp
 )
 
@@ -43,6 +44,7 @@ set(HEADERS
     EmergeEngine.h
     VdbManager.h
     BinPkgManager.h
+    WatchEngine.h
 )
 
 add_executable(uppbuilder ${SOURCES} ${HEADERS})

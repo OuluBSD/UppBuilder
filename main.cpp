@@ -15,6 +15,7 @@
 #include "EmergeEngine.h"
 #include "VdbManager.h"
 #include "BinPkgManager.h"
+#include "WatchEngine.h"
 
 using namespace UppBuilder;
 
@@ -82,6 +83,10 @@ void PrintUsage(const char* prog) {
     std::cout << "  -K, --usepkgonly              Only use binary packages; fail if missing\n";
     std::cout << "  binpkg list                   List cached binary packages for active profile\n";
     std::cout << "  binpkg clean                  Clean cached binary packages for active profile\n";
+    std::cout << "  watch [dirs...]               Watch directories and run tests incrementally on mutations\n";
+    std::cout << "  --atom <target>               Set target test atom for watch engine (auto-detects if omitted)\n";
+    std::cout << "  --port <port>                 Set AgentIPC TCP loopback port (default: 7421)\n";
+    std::cout << "  --once                        Run one snapshot detection pass and exit\n";
     std::cout << "  vdb list                      List installed packages in VDB database\n";
     std::cout << "  vdb info <atom>               Show installed package details from VDB database\n";
     std::cout << "  vdb diff <p1> <p2>            Compare installed packages between two profiles\n";
@@ -163,6 +168,12 @@ int main(int argc, char* argv[]) {
 
     bool do_test = false;
     std::vector<std::string> test_atoms;
+
+    bool do_watch = false;
+    std::vector<std::string> watch_dirs;
+    std::string watch_atom;
+    int watch_port = 7421;
+    bool watch_once = false;
 
     bool emerge_buildpkg = false;
     bool emerge_usepkg = false;
@@ -467,12 +478,24 @@ int main(int argc, char* argv[]) {
             } else {
                 binpkg_list = true;
             }
+        } else if (arg == "watch") {
+            do_watch = true;
+            while (i + 1 < argc && argv[i + 1][0] != '-') {
+                watch_dirs.push_back(argv[++i]);
+            }
+        } else if (arg == "--atom") {
+            if (i + 1 < argc) watch_atom = argv[++i];
+        } else if (arg == "--port") {
+            if (i + 1 < argc) watch_port = std::stoi(argv[++i]);
+        } else if (arg == "--once") {
+            watch_once = true;
         } else if (arg == "-a" || arg == "--add-root") {
             if (i + 1 < argc) extra_roots.push_back(argv[++i]);
         } else if (arg[0] != '-') {
             if (do_emerge) emerge_atoms.push_back(arg);
             else if (do_test) test_atoms.push_back(arg);
             else if (do_unmerge) unmerge_atoms.push_back(arg);
+            else if (do_watch) watch_dirs.push_back(arg);
             else target_pkg = arg;
         }
     }
@@ -793,6 +816,20 @@ int main(int argc, char* argv[]) {
         TestSummary summary;
         bool ok = EmergeEngine::RunTests(test_atoms, summary, verbose, custom_overlay_dir, base_for_patches);
         return ok ? 0 : 1;
+    }
+
+    if (do_watch) {
+        WatchOptions w_opt;
+        w_opt.directories = watch_dirs;
+        w_opt.test_atom = watch_atom;
+        w_opt.port = watch_port;
+        w_opt.verbose = verbose;
+        if (watch_once) {
+            w_opt.max_iterations = 1;
+            w_opt.run_immediate = true;
+        }
+        WatchEngine watcher;
+        return watcher.Run(w_opt) ? 0 : 1;
     }
 
     TargetProfile target_profile;
