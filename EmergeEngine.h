@@ -44,8 +44,14 @@ public:
     // 1. For virtuals: installs host packages (e.g. vcpkg/apt/brew) or reports plugin
     // 2. For repositories: clones/fetches into ~/<org>/<repo> if missing or update requested
     // 3. For packages: builds default_package with UppBuilder/umk with active profile flags
+    // 4. Records installed package into VDB
     static bool Execute(const EmergePlan& plan,
                         bool update = false,
+                        bool verbose = false);
+
+    // Safely unmerges packages from VDB and deletes recorded artifacts
+    static bool Unmerge(const std::vector<std::string>& atoms,
+                        bool force = false,
                         bool verbose = false);
 
     // Resolves canonical local checkout path for a package:

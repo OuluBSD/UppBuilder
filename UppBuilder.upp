@@ -6,6 +6,7 @@ uses
 file
 	AGENTS.md,
 	UppBuilder.h,
+	UppBuilder.cpp,
 	Bridge.h,
 	Bridge.cpp,
 	UppParser.h,
@@ -34,6 +35,8 @@ file
 	OverlayManager.cpp,
 	EmergeEngine.h,
 	EmergeEngine.cpp,
+	VdbManager.h,
+	VdbManager.cpp,
 	main.cpp;
 
 mainconfig

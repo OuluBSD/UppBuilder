@@ -238,8 +238,12 @@ Portage Package & USE Management:
 Target Profiles & Portage Overlay:
   emerge <atoms...>             Resolve dependencies and emerge packages
   install <atoms...>            Alias for emerge
+  unmerge <atoms...>            Unmerge package and remove artifacts
+  --force                       Force unmerge ignoring reverse dependencies
   -p, --pretend                 Display merge plan without executing changes
   -u, --update                  Update existing repository checkouts before build
+  vdb list                      List installed packages in VDB database
+  vdb info <atom>               Show installed package details from VDB database
   --profile <name>              Select target profile (e.g. NativeClang, NativeGcc, MsvcX64, WasmBrowser)
   profile list                  List all available target profiles
   profile show [name]           Show configuration details for a target profile

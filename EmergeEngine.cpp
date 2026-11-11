@@ -1,4 +1,5 @@
 #include "EmergeEngine.h"
+#include "VdbManager.h"
 #include <functional>
 #include <sstream>
 
@@ -228,7 +229,20 @@ bool EmergeEngine::Execute(const EmergePlan& plan, bool update, bool verbose) {
         }
 
         // 2. Compile package
-        if (!item.build_info.default_package.empty()) {
+        if (item.build_info.fn_src_compile.find("bootstrap") != std::string::npos) {
+            std::cout << ">>> Running bootstrap in " << repo_dir << "...\n";
+            std::string bcmd;
+#ifdef _WIN32
+            bcmd = "cd /d \"" + repo_dir + "\" && bootstrap.bat";
+#else
+            bcmd = "cd \"" + repo_dir + "\" && ./bootstrap.sh";
+#endif
+            int ret = RunCommand(bcmd);
+            if (ret != 0) {
+                std::cerr << "Error: Bootstrap failed for " << item.atom << "\n";
+                return false;
+            }
+        } else if (!item.build_info.default_package.empty()) {
             std::string target = item.build_info.default_package;
             std::cout << ">>> Building target '" << target << "' in " << repo_dir << "...\n";
 
@@ -264,21 +278,8 @@ bool EmergeEngine::Execute(const EmergePlan& plan, bool update, bool verbose) {
                 return false;
             }
         } else if (!item.build_info.fn_src_compile.empty()) {
-            // Custom bootstrap or make in src_compile
-            if (item.build_info.fn_src_compile.find("bootstrap") != std::string::npos) {
-                std::cout << ">>> Running bootstrap in " << repo_dir << "...\n";
-                std::string bcmd;
-#ifdef _WIN32
-                bcmd = "cd /d \"" + repo_dir + "\" && bootstrap.bat";
-#else
-                bcmd = "cd \"" + repo_dir + "\" && ./bootstrap.sh";
-#endif
-                int ret = RunCommand(bcmd);
-                if (ret != 0) {
-                    std::cerr << "Error: Bootstrap failed for " << item.atom << "\n";
-                    return false;
-                }
-            } else if (item.build_info.fn_src_compile.find("make") != std::string::npos) {
+            // Custom make in src_compile
+            if (item.build_info.fn_src_compile.find("make") != std::string::npos) {
                 std::cout << ">>> Running make in " << repo_dir << "...\n";
                 std::string mcmd;
 #ifdef _WIN32
@@ -294,11 +295,75 @@ bool EmergeEngine::Execute(const EmergePlan& plan, bool update, bool verbose) {
             }
         }
 
+        // 3. Register package in VDB
+        VdbEntry vdb_entry;
+        vdb_entry.atom = item.atom;
+        vdb_entry.version = item.build_info.version.empty() ? "0.1.0" : item.build_info.version;
+        vdb_entry.profile = plan.profile_name;
+        for (const auto& f : item.active_use_flags) {
+            if (!vdb_entry.use.empty()) vdb_entry.use += " ";
+            vdb_entry.use += f;
+        }
+        vdb_entry.repo_path = repo_dir;
+        vdb_entry.target = item.build_info.default_package;
+        vdb_entry.rdepend = item.build_info.rdepend;
+
+        std::string bin_dir = repo_dir + "/bin";
+        if (DirectoryExists(bin_dir)) {
+            vdb_entry.files.push_back(bin_dir);
+        }
+        VdbManager::RegisterPackage(vdb_entry);
+        if (verbose) {
+            std::cout << ">>> Registered " << item.atom << " in VDB database.\n";
+        }
+
         std::cout << ">>> Successfully emerged " << item.atom << "!\n";
     }
 
     std::cout << "\n*** Emerge process completed successfully.\n";
     return true;
+}
+
+bool EmergeEngine::Unmerge(const std::vector<std::string>& atoms, bool force, bool verbose) {
+    if (atoms.empty()) {
+        std::cerr << "Error: No packages specified to unmerge.\n";
+        return false;
+    }
+
+    bool all_ok = true;
+    for (const auto& atom : atoms) {
+        std::cout << "\n>>> Unmerging " << atom << "...\n";
+        VdbEntry entry;
+        if (!VdbManager::IsInstalled(atom, &entry)) {
+            std::cout << "--- " << atom << " is not recorded in VDB.\n";
+            continue;
+        }
+
+        // Check reverse dependencies
+        auto rev = VdbManager::FindReverseDependencies(atom);
+        if (!rev.empty() && !force) {
+            std::cerr << "Error: Cannot unmerge " << atom << " because the following installed packages depend on it:\n";
+            for (const auto& r : rev) {
+                std::cerr << "  * " << r << "\n";
+            }
+            std::cerr << "Use --force to unmerge anyway.\n";
+            all_ok = false;
+            continue;
+        }
+
+        // Clean built outputs recorded in files
+        for (const auto& f : entry.files) {
+            if (verbose) std::cout << ">>> Cleaning build artifacts: " << f << "\n";
+        }
+
+        if (VdbManager::UnregisterPackage(atom)) {
+            std::cout << ">>> Successfully unmerged " << atom << ".\n";
+        } else {
+            std::cerr << "Error: Failed to unregister " << atom << " from VDB.\n";
+            all_ok = false;
+        }
+    }
+    return all_ok;
 }
 
 } // namespace UppBuilder

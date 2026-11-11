@@ -303,14 +303,24 @@ int UmkDriver::ExecuteBuild(const std::string& umk_exe,
     if (clean) umk_opts += "a";
     ss << " " << umk_opts;
 
-    std::string active_flags = flags;
+    std::string active_flags;
+    std::vector<std::string> raw_tokens = Split(flags, ' ');
+    for (const auto& tok : raw_tokens) {
+        for (const auto& sub : Split(tok, ',')) {
+            std::string su = ToUpper(sub);
+            if (su.empty() || su == "BLITZ" || su == "NOBLITZ") continue;
+            if (!active_flags.empty()) active_flags += ",";
+            active_flags += sub;
+        }
+    }
+
     if (!release) {
         if (active_flags.find("DEBUG") == std::string::npos) {
             active_flags = active_flags.empty() ? "DEBUG" : (active_flags + ",DEBUG");
         }
     }
     if (!active_flags.empty()) {
-        ss << " +" << Replace(active_flags, " ", ",");
+        ss << " +" << active_flags;
     }
 
     if (!output_binary.empty()) {

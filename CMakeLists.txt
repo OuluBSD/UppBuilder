@@ -20,6 +20,7 @@ set(SOURCES
     ProviderPlanner.cpp
     OverlayManager.cpp
     EmergeEngine.cpp
+    VdbManager.cpp
     main.cpp
 )
 
@@ -39,6 +40,7 @@ set(HEADERS
     ProviderPlanner.h
     OverlayManager.h
     EmergeEngine.h
+    VdbManager.h
 )
 
 add_executable(uppbuilder ${SOURCES} ${HEADERS})

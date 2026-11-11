@@ -74,6 +74,11 @@ jobs:
           ./uppbuilder emerge AiAgents/SuperIntelligence -p
           ./uppbuilder install MediaSound/SoftAudio --profile NativeClang -p
 
+      - name: Test VDB and Unmerge Lifecycle
+        run: |
+          ./uppbuilder vdb list
+          ./uppbuilder unmerge DevCpp/NonExistent -p || true
+
       - name: Test CMake Build
         run: |
           mkdir -p build && cd build
@@ -142,6 +147,12 @@ jobs:
           uppbuilder.exe emerge DevCpp/Eon -p
           uppbuilder.exe emerge AiAgents/SuperIntelligence -p
           uppbuilder.exe install MediaSound/SoftAudio --profile MsvcX64 -p
+
+      - name: Test VDB and Unmerge Lifecycle
+        shell: cmd
+        run: |
+          uppbuilder.exe vdb list
+          uppbuilder.exe unmerge DevCpp/NonExistent -p || ver >nul
 
       - name: Test CMake Build
         shell: cmd

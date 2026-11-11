@@ -1,4 +1,5 @@
 #include "ProviderPlanner.h"
+#include "OverlayManager.h"
 #include <algorithm>
 
 namespace UppBuilder {
@@ -12,27 +13,11 @@ bool ProviderPlanner::HostHasTool(const std::string& tool_name) {
     return (RunCommand(test_cmd) == 0);
 }
 
-static std::vector<std::string> FindOverlayCandidates(const std::string& overlay_path) {
-    std::vector<std::string> candidates;
-    if (!overlay_path.empty()) candidates.push_back(overlay_path);
-
-    std::string cwd = GetCurrentDir();
-    candidates.push_back(JoinPath(cwd, "UppOverlay"));
-    candidates.push_back(JoinPath(GetParentDir(cwd), "UppOverlay"));
-    candidates.push_back(JoinPath(JoinPath(GetParentDir(cwd), "OuluBSD"), "UppOverlay"));
-
-    std::string home = GetEnvValue("HOME");
-    if (!home.empty()) {
-        candidates.push_back(JoinPath(JoinPath(home, "OuluBSD"), "UppOverlay"));
-        candidates.push_back(JoinPath(JoinPath(home, "Dev"), "UppOverlay"));
-    }
-    return candidates;
-}
-
 std::vector<std::string> ProviderPlanner::ListVirtuals(const std::string& overlay_path) {
     std::vector<std::string> res;
-    for (const auto& cand : FindOverlayCandidates(overlay_path)) {
-        std::string virt_dir = JoinPath(cand, "Virtual");
+    std::string root = OverlayManager::FindOverlayRoot(overlay_path);
+    if (!root.empty()) {
+        std::string virt_dir = JoinPath(root, "Virtual");
         if (DirectoryExists(virt_dir)) {
             for (const auto& item : ListDir(virt_dir)) {
                 if (item.empty() || item.front() == '.') continue;
@@ -61,8 +46,9 @@ ResolvedProvider ProviderPlanner::Resolve(const std::string& virtual_name, const
     // Look for .escbuild in Virtual/<leaf>
     EscBuildInfo info;
     bool found = false;
-    for (const auto& cand : FindOverlayCandidates(overlay_path)) {
-        std::string pkg_dir = JoinPath(JoinPath(cand, "Virtual"), leaf);
+    std::string root = OverlayManager::FindOverlayRoot(overlay_path);
+    if (!root.empty()) {
+        std::string pkg_dir = JoinPath(JoinPath(root, "Virtual"), leaf);
         if (DirectoryExists(pkg_dir)) {
             for (const auto& f : ListDir(pkg_dir)) {
                 if (EndsWith(f, ".escbuild") || EndsWith(f, ".ebuild")) {
@@ -73,7 +59,6 @@ ResolvedProvider ProviderPlanner::Resolve(const std::string& virtual_name, const
                 }
             }
         }
-        if (found) break;
     }
 
     if (!found) {

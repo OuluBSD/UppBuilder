@@ -1,4 +1,5 @@
 #include "ProfileManager.h"
+#include "OverlayManager.h"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
@@ -110,28 +111,11 @@ static void ParseMakeConf(const std::string& path, TargetProfile& p) {
     }
 }
 
-static std::vector<std::string> FindOverlayCandidates(const std::string& overlay_path) {
-    std::vector<std::string> candidates;
-    if (!overlay_path.empty()) candidates.push_back(overlay_path);
-
-    std::string cwd = GetCurrentDir();
-    candidates.push_back(JoinPath(cwd, "UppOverlay"));
-    candidates.push_back(JoinPath(GetParentDir(cwd), "UppOverlay"));
-    candidates.push_back(JoinPath(JoinPath(GetParentDir(cwd), "OuluBSD"), "UppOverlay"));
-
-    std::string home = GetEnvValue("HOME");
-    if (!home.empty()) {
-        candidates.push_back(JoinPath(JoinPath(home, "OuluBSD"), "UppOverlay"));
-        candidates.push_back(JoinPath(JoinPath(home, "Dev"), "UppOverlay"));
-    }
-    return candidates;
-}
-
 std::vector<std::string> ProfileManager::ListProfiles(const std::string& overlay_path) {
     std::vector<std::string> list;
-    std::vector<std::string> cands = FindOverlayCandidates(overlay_path);
-    for (const auto& cand : cands) {
-        std::string targets_dir = JoinPath(JoinPath(cand, "profiles"), "targets");
+    std::string root = OverlayManager::FindOverlayRoot(overlay_path);
+    if (!root.empty()) {
+        std::string targets_dir = JoinPath(JoinPath(root, "profiles"), "targets");
         if (DirectoryExists(targets_dir)) {
             for (const auto& item : ListDir(targets_dir)) {
                 if (item.empty() || item.front() == '.') continue;
@@ -157,16 +141,14 @@ TargetProfile ProfileManager::LoadProfile(const std::string& profile_name, const
     p.name = name;
     p.output_cache = GetDefaultOutputCache();
 
-    bool found_overlay = false;
-    std::vector<std::string> cands = FindOverlayCandidates(overlay_path);
-    for (const auto& cand : cands) {
-        std::string base_conf = JoinPath(JoinPath(JoinPath(cand, "profiles"), "base"), "make.conf");
+    std::string root = OverlayManager::FindOverlayRoot(overlay_path);
+    if (!root.empty()) {
+        std::string base_conf = JoinPath(JoinPath(JoinPath(root, "profiles"), "base"), "make.conf");
         if (FileExists(base_conf)) {
             ParseMakeConf(base_conf, p);
-            found_overlay = true;
         }
 
-        std::string target_dir = JoinPath(JoinPath(JoinPath(cand, "profiles"), "targets"), name);
+        std::string target_dir = JoinPath(JoinPath(JoinPath(root, "profiles"), "targets"), name);
         std::string target_conf = JoinPath(target_dir, "make.conf");
         if (FileExists(target_conf)) {
             p.path = target_dir;
@@ -176,12 +158,7 @@ TargetProfile ProfileManager::LoadProfile(const std::string& profile_name, const
         }
     }
 
-    if (!found_overlay) {
-        return GetBuiltinProfile(name);
-    }
-
-    p.default_use = DeduplicateTokens(p.default_use);
-    return p;
+    return GetBuiltinProfile(name);
 }
 
 } // namespace UppBuilder

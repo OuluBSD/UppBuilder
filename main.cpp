@@ -13,6 +13,7 @@
 #include "ProviderPlanner.h"
 #include "OverlayManager.h"
 #include "EmergeEngine.h"
+#include "VdbManager.h"
 
 using namespace UppBuilder;
 
@@ -66,8 +67,12 @@ void PrintUsage(const char* prog) {
     std::cout << "Target Profiles & Portage Overlay:\n";
     std::cout << "  emerge <atoms...>             Resolve dependencies and emerge packages\n";
     std::cout << "  install <atoms...>            Alias for emerge\n";
+    std::cout << "  unmerge <atoms...>            Unmerge package and remove artifacts\n";
+    std::cout << "  --force                       Force unmerge ignoring reverse dependencies\n";
     std::cout << "  -p, --pretend                 Display merge plan without executing changes\n";
     std::cout << "  -u, --update                  Update existing repository checkouts before build\n";
+    std::cout << "  vdb list                      List installed packages in VDB database\n";
+    std::cout << "  vdb info <atom>               Show installed package details from VDB database\n";
     std::cout << "  --profile <name>              Select target profile (e.g. NativeClang, NativeGcc, MsvcX64, WasmBrowser)\n";
     std::cout << "  profile list                  List all available target profiles\n";
     std::cout << "  profile show [name]           Show configuration details for a target profile\n";
@@ -136,6 +141,14 @@ int main(int argc, char* argv[]) {
     bool emerge_pretend = false;
     bool emerge_update = false;
     std::vector<std::string> emerge_atoms;
+
+    bool do_unmerge = false;
+    bool unmerge_force = false;
+    std::vector<std::string> unmerge_atoms;
+
+    bool vdb_list = false;
+    bool vdb_info = false;
+    std::string vdb_info_atom;
 
     std::string staging_dir = ".uppbuilder/staging";
     std::string applied_patches_dir;
@@ -350,6 +363,23 @@ int main(int argc, char* argv[]) {
             while (i + 1 < argc && argv[i + 1][0] != '-') {
                 emerge_atoms.push_back(argv[++i]);
             }
+        } else if (arg == "unmerge") {
+            do_unmerge = true;
+            while (i + 1 < argc && argv[i + 1][0] != '-') {
+                unmerge_atoms.push_back(argv[++i]);
+            }
+        } else if (arg == "--force") {
+            unmerge_force = true;
+        } else if (arg == "vdb") {
+            if (i + 1 < argc) {
+                std::string sub = argv[++i];
+                if (sub == "list") {
+                    vdb_list = true;
+                } else if (sub == "info" && i + 1 < argc) {
+                    vdb_info = true;
+                    vdb_info_atom = argv[++i];
+                }
+            }
         } else if (arg == "-p" || arg == "--pretend") {
             emerge_pretend = true;
         } else if (arg == "-u" || arg == "--update") {
@@ -556,6 +586,47 @@ int main(int argc, char* argv[]) {
         return 0;
     }
 
+    if (vdb_list) {
+        auto installed = VdbManager::ListInstalled();
+        std::cout << "Installed Packages in VDB (" << installed.size() << "):\n";
+        for (const auto& pkg : installed) {
+            std::cout << "  * " << pkg.atom;
+            if (!pkg.version.empty()) std::cout << "-" << pkg.version;
+            if (!pkg.profile.empty()) std::cout << " [" << pkg.profile << "]";
+            if (!pkg.use.empty()) std::cout << " (USE: " << pkg.use << ")";
+            std::cout << "\n";
+        }
+        return 0;
+    }
+
+    if (vdb_info) {
+        VdbEntry entry;
+        if (!VdbManager::IsInstalled(vdb_info_atom, &entry)) {
+            std::cerr << "Package '" << vdb_info_atom << "' is not installed in VDB.\n";
+            return 1;
+        }
+        std::cout << "Package:      " << entry.atom << "\n";
+        std::cout << "Version:      " << entry.version << "\n";
+        std::cout << "Profile:      " << entry.profile << "\n";
+        std::cout << "USE:          " << entry.use << "\n";
+        std::cout << "Repository:   " << entry.repo_path << "\n";
+        std::cout << "Target:       " << entry.target << "\n";
+        std::cout << "Installed:    " << entry.install_time << "\n";
+        if (!entry.rdepend.empty()) {
+            std::cout << "Dependencies:\n";
+            for (const auto& d : entry.rdepend) std::cout << "  - " << d << "\n";
+        }
+        if (!entry.files.empty()) {
+            std::cout << "Files:\n";
+            for (const auto& f : entry.files) std::cout << "  - " << f << "\n";
+        }
+        return 0;
+    }
+
+    if (do_unmerge) {
+        return EmergeEngine::Unmerge(unmerge_atoms, unmerge_force, verbose) ? 0 : 1;
+    }
+
     TargetProfile target_profile;
     if (!selected_profile.empty()) {
         target_profile = ProfileManager::LoadProfile(selected_profile, custom_overlay_dir);
@@ -696,9 +767,19 @@ int main(int argc, char* argv[]) {
     std::string tut_root = JoinPath(repo_root, "tutorial");
     if (DirectoryExists(tut_root)) assembly_roots.push_back(tut_root);
     assembly_roots.push_back(JoinPath(repo_root, "upptst"));
+    std::string tests_root = JoinPath(repo_root, "tests");
+    if (DirectoryExists(tests_root)) assembly_roots.push_back(tests_root);
     assembly_roots.push_back(JoinPath(repo_root, "src"));
     if (DirectoryExists(JoinPath(repo_root, ".git")) || DirectoryExists(JoinPath(repo_root, "uppsrc"))) {
         assembly_roots.push_back(repo_root);
+    }
+    std::string parent_dir = GetParentDir(repo_root);
+    if (!parent_dir.empty() && DirectoryExists(parent_dir)) {
+        if (FileExists(JoinPath(repo_root, target_pkg + ".upp")) ||
+            FileExists(JoinPath(repo_root, GetFileTitle(repo_root) + ".upp")) ||
+            FileExists(JoinPath(repo_root, GetFileName(repo_root) + ".upp"))) {
+            assembly_roots.push_back(parent_dir);
+        }
     }
     for (const auto& er : extra_roots) assembly_roots.push_back(er);
 
