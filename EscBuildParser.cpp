@@ -271,6 +271,7 @@ bool EscBuildParser::ParseContent(const std::string& content, EscBuildInfo& out_
 
                 if (id == "src_unpack") out_info.fn_src_unpack = Trim(body);
                 else if (id == "src_compile") out_info.fn_src_compile = Trim(body);
+                else if (id == "src_test") out_info.fn_src_test = Trim(body);
                 else if (id == "src_install") out_info.fn_src_install = Trim(body);
                 continue;
             }

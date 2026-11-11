@@ -67,6 +67,8 @@ void PrintUsage(const char* prog) {
     std::cout << "Target Profiles & Portage Overlay:\n";
     std::cout << "  emerge <atoms...>             Resolve dependencies and emerge packages\n";
     std::cout << "  install <atoms...>            Alias for emerge\n";
+    std::cout << "  test [atoms...]               Run test suites for packages (default: @installed)\n";
+    std::cout << "  --test                        Run test suites after emerging packages\n";
     std::cout << "  unmerge <atoms...>            Unmerge package and remove artifacts\n";
     std::cout << "  --force                       Force unmerge ignoring reverse dependencies\n";
     std::cout << "  -p, --pretend                 Display merge plan without executing changes\n";
@@ -140,7 +142,11 @@ int main(int argc, char* argv[]) {
     bool do_emerge = false;
     bool emerge_pretend = false;
     bool emerge_update = false;
+    bool emerge_test = false;
     std::vector<std::string> emerge_atoms;
+
+    bool do_test = false;
+    std::vector<std::string> test_atoms;
 
     bool do_unmerge = false;
     bool unmerge_force = false;
@@ -363,6 +369,13 @@ int main(int argc, char* argv[]) {
             while (i + 1 < argc && argv[i + 1][0] != '-') {
                 emerge_atoms.push_back(argv[++i]);
             }
+        } else if (arg == "test") {
+            do_test = true;
+            while (i + 1 < argc && argv[i + 1][0] != '-') {
+                test_atoms.push_back(argv[++i]);
+            }
+        } else if (arg == "-t" || arg == "--test") {
+            emerge_test = true;
         } else if (arg == "unmerge") {
             do_unmerge = true;
             while (i + 1 < argc && argv[i + 1][0] != '-') {
@@ -580,7 +593,7 @@ int main(int argc, char* argv[]) {
         if (emerge_pretend) {
             return 0;
         }
-        if (!EmergeEngine::Execute(plan, emerge_update, verbose)) {
+        if (!EmergeEngine::Execute(plan, emerge_update, verbose, emerge_test)) {
             return 1;
         }
         return 0;
@@ -625,6 +638,15 @@ int main(int argc, char* argv[]) {
 
     if (do_unmerge) {
         return EmergeEngine::Unmerge(unmerge_atoms, unmerge_force, verbose) ? 0 : 1;
+    }
+
+    if (do_test) {
+        if (test_atoms.empty()) {
+            test_atoms.push_back("@installed");
+        }
+        TestSummary summary;
+        bool ok = EmergeEngine::RunTests(test_atoms, summary, verbose, custom_overlay_dir);
+        return ok ? 0 : 1;
     }
 
     TargetProfile target_profile;

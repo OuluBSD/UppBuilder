@@ -29,6 +29,21 @@ struct EmergePlan {
     std::string error;
 };
 
+struct TestResult {
+    std::string atom;
+    std::string suite;
+    bool success = false;
+    long duration_ms = 0;
+    std::string message;
+};
+
+struct TestSummary {
+    std::vector<TestResult> results;
+    int passed = 0;
+    int failed = 0;
+    int skipped = 0;
+};
+
 class EmergeEngine {
 public:
     // Resolves dependencies and builds a topological merge plan for one or more atoms
@@ -45,14 +60,28 @@ public:
     // 2. For repositories: clones/fetches into ~/<org>/<repo> if missing or update requested
     // 3. For packages: builds default_package with UppBuilder/umk with active profile flags
     // 4. Records installed package into VDB
+    // 5. If run_tests is true: runs src_test() for emerged packages
     static bool Execute(const EmergePlan& plan,
                         bool update = false,
-                        bool verbose = false);
+                        bool verbose = false,
+                        bool run_tests = false);
 
     // Safely unmerges packages from VDB and deletes recorded artifacts
     static bool Unmerge(const std::vector<std::string>& atoms,
                         bool force = false,
                         bool verbose = false);
+
+    // Executes tests for specified atoms or @installed
+    static bool RunTests(const std::vector<std::string>& atoms,
+                         TestSummary& out_summary,
+                         bool verbose = false,
+                         const std::string& overlay_root = "");
+
+    // Executes test for a single package given its EscBuildInfo and repo directory
+    static bool ExecuteSingleTest(const EscBuildInfo& info,
+                                 const std::string& repo_dir,
+                                 TestResult& out_result,
+                                 bool verbose = false);
 
     // Resolves canonical local checkout path for a package:
     // Follows convention ~/<organization>/<repo_name>

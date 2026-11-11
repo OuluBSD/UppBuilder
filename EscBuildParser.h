@@ -26,6 +26,7 @@ struct EscBuildInfo {
 
     std::string fn_src_unpack;
     std::string fn_src_compile;
+    std::string fn_src_test;
     std::string fn_src_install;
 
     std::vector<std::string> warnings;
