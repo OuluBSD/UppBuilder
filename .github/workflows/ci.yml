@@ -79,6 +79,12 @@ jobs:
           ./uppbuilder vdb list
           ./uppbuilder unmerge DevCpp/NonExistent -p || true
 
+      - name: Test Binary Packages & WatchEngine
+        run: |
+          ./uppbuilder binpkg list
+          ./uppbuilder binpkg clean
+          ./uppbuilder watch --once --port 7430 examples/AuditTestPkg
+
       - name: Test CMake Build
         run: |
           mkdir -p build && cd build
@@ -153,6 +159,13 @@ jobs:
         run: |
           uppbuilder.exe vdb list
           uppbuilder.exe unmerge DevCpp/NonExistent -p || ver >nul
+
+      - name: Test Binary Packages & WatchEngine
+        shell: cmd
+        run: |
+          uppbuilder.exe binpkg list
+          uppbuilder.exe binpkg clean
+          uppbuilder.exe watch --once --port 7430 examples\AuditTestPkg
 
       - name: Test CMake Build
         shell: cmd
