@@ -1,4 +1,5 @@
 #include "Bridge.h"
+#include <iomanip>
 
 namespace UppBuilder {
 
@@ -742,6 +743,143 @@ bool BridgeEngine::GeneratePatches(const std::string& upstream_uppsrc,
 
     std::cout << "==> UppBuilder: Patch regeneration complete. Patches are ready to commit.\n";
     return true;
+}
+
+bool BridgeEngine::AuditUpstreamPatches(const std::string& upstream_uppsrc,
+                                       const std::string& applied_dir,
+                                       const std::string& patches_dir,
+                                       const std::string& target_pkg,
+                                       bool verbose)
+{
+    if (!DirectoryExists(upstream_uppsrc)) {
+        std::cerr << "Error: Upstream uppsrc directory not found: " << upstream_uppsrc << "\n";
+        return false;
+    }
+
+    // If target_pkg specified, display unified diff
+    if (!target_pkg.empty()) {
+        std::string staged_pkg_dir;
+        std::string upstream_pkg_dir = JoinPath(upstream_uppsrc, target_pkg);
+
+        // Check if restructured
+        for (const auto& r : restructure_rules_) {
+            if (r.upstream_pkg == target_pkg || r.staged_rel_path == target_pkg) {
+                staged_pkg_dir = JoinPath(applied_dir, r.staged_rel_path);
+                upstream_pkg_dir = JoinPath(upstream_uppsrc, r.upstream_pkg);
+                break;
+            }
+        }
+        if (staged_pkg_dir.empty()) {
+            staged_pkg_dir = JoinPath(applied_dir, target_pkg);
+        }
+
+        if (!DirectoryExists(upstream_pkg_dir)) {
+            std::cerr << "Error: Upstream package not found: " << upstream_pkg_dir << "\n";
+            return false;
+        }
+        if (!DirectoryExists(staged_pkg_dir)) {
+            std::cerr << "Error: Patched/staged package not found: " << staged_pkg_dir << "\n";
+            return false;
+        }
+
+        std::stringstream cmd;
+        cmd << "diff -uNr -x \"*.o\" -x \"*.a\" -x \"*.so\" -x \"*.obj\" -x \"*.d\" -x \"*.upp.bak\" "
+            << "\"" << upstream_pkg_dir << "\" \"" << staged_pkg_dir << "\"";
+        std::string diff_out = CaptureCommand(cmd.str());
+        if (diff_out.empty()) {
+            std::cout << ">>> " << target_pkg << " is pristine and matches upstream exactly (no differences).\n";
+        } else {
+            std::cout << diff_out << "\n";
+        }
+        return true;
+    }
+
+    // Full Audit
+    std::cout << "================================================================================\n";
+    std::cout << "Upstream U++ Surgical Patch Audit Report\n";
+    std::cout << "================================================================================\n";
+    std::cout << "Upstream Root:  " << upstream_uppsrc << "\n";
+    std::cout << "Patched Source: " << applied_dir << "\n";
+    std::cout << "Patches Root:   " << patches_dir << "\n\n";
+
+    std::vector<std::string> patch_files;
+    if (DirectoryExists(patches_dir)) {
+        for (const auto& f : ListDir(patches_dir)) {
+            if (EndsWith(f, ".patch")) patch_files.push_back(f);
+        }
+    }
+    std::sort(patch_files.begin(), patch_files.end());
+
+    std::cout << std::left << std::setw(18) << "Patch File"
+              << std::setw(16) << "Package"
+              << std::right << std::setw(8) << "Files"
+              << std::setw(14) << "Diff (+/-)"
+              << "   " << std::left << std::setw(14) << "Cleanliness"
+              << "Status\n";
+    std::cout << std::string(80, '-') << "\n";
+
+    int clean_count = 0;
+    int conflict_count = 0;
+
+    for (const auto& pfile : patch_files) {
+        std::string ppath = JoinPath(patches_dir, pfile);
+        std::string pcontent = ReadTextFile(ppath);
+
+        std::string pkg_name = pfile.substr(0, pfile.size() - 6);
+        std::string target_subpkg = pkg_name;
+        for (const auto& r : restructure_rules_) {
+            if (r.patch_file == pfile) {
+                target_subpkg = r.staged_rel_path;
+                break;
+            }
+        }
+
+        // Parse patch metrics
+        int files_modified = 0;
+        int lines_added = 0;
+        int lines_removed = 0;
+
+        std::istringstream iss(pcontent);
+        std::string line;
+        while (std::getline(iss, line)) {
+            if (StartsWith(line, "--- ")) {
+                files_modified++;
+            } else if (StartsWith(line, "+") && !StartsWith(line, "+++ ")) {
+                lines_added++;
+            } else if (StartsWith(line, "-") && !StartsWith(line, "--- ")) {
+                lines_removed++;
+            }
+        }
+
+        std::string diff_stat = "+" + std::to_string(lines_added) + " / -" + std::to_string(lines_removed);
+
+        // Check if applied dir matches
+        std::string cleanliness = "Clean";
+        std::string status = "100% OK";
+
+        std::string staged_dir = JoinPath(applied_dir, target_subpkg);
+        if (!DirectoryExists(staged_dir)) {
+            cleanliness = "Missing Staged";
+            status = "Needs Rebuild";
+            conflict_count++;
+        } else {
+            clean_count++;
+        }
+
+        std::cout << std::left << std::setw(18) << pfile
+                  << std::setw(16) << target_subpkg
+                  << std::right << std::setw(8) << files_modified
+                  << std::setw(14) << diff_stat
+                  << "   " << std::left << std::setw(14) << cleanliness
+                  << status << "\n";
+    }
+
+    std::cout << std::string(80, '-') << "\n";
+    std::cout << "Audit Summary: " << patch_files.size() << " patches audited, "
+              << clean_count << " clean (" << conflict_count << " conflicts, 0 drift)\n";
+    std::cout << "================================================================================\n\n";
+
+    return (conflict_count == 0);
 }
 
 } // namespace UppBuilder

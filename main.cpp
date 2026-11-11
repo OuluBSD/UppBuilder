@@ -47,6 +47,7 @@ void PrintUsage(const char* prog) {
     std::cout << "  --uppgeometry <dir>           Path to UppGeometry repository (Geometry, Draw/Extensions, etc.)\n";
     std::cout << "  --apply-patches               Materialize applied-patches with restructuring & apply patches\n";
     std::cout << "  --make-patches                Reverse-diff applied-patches against upstream into patches/\n";
+    std::cout << "  upstream-diff [pkg]           Audit surgical patches against upstream U++ repository\n";
     std::cout << "  --applied-patches <dir>       Path to applied-patches directory (default: applied-patches)\n";
     std::cout << "  --upstream <dir>              Path to pristine upstream ultimatepp/uppsrc\n";
     std::cout << "  --patches-dir <dir>           Path to patches directory (default: patches)\n\n";
@@ -179,6 +180,8 @@ int main(int argc, char* argv[]) {
     std::string custom_uppgeometry;
     bool apply_patches_cmd = false;
     bool make_patches_cmd = false;
+    bool upstream_diff_cmd = false;
+    std::string upstream_diff_pkg;
     std::string custom_umk;
     std::vector<std::string> extra_roots;
 
@@ -242,6 +245,11 @@ int main(int argc, char* argv[]) {
             apply_patches_cmd = true;
         } else if (arg == "--make-patches") {
             make_patches_cmd = true;
+        } else if (arg == "upstream-diff" || arg == "--upstream-diff") {
+            upstream_diff_cmd = true;
+            if (i + 1 < argc && argv[i + 1][0] != '-') {
+                upstream_diff_pkg = argv[++i];
+            }
         } else if (arg == "--redirect" && i + 1 < argc) {
             std::string mapping = argv[++i];
             size_t eq = mapping.find('=');
@@ -734,6 +742,25 @@ int main(int argc, char* argv[]) {
     std::string full_applied = ResolvePatchedUppsrcPath(applied_patches_dir, base_for_patches);
     std::string full_patches = (StartsWith(patches_dir, "/") || (patches_dir.size() >= 2 && patches_dir[1] == ':')) ?
                                patches_dir : JoinPath(base_for_patches, patches_dir);
+
+    // Handle upstream-diff command
+    if (upstream_diff_cmd) {
+        if (upstream_dir_resolved.empty() || !DirectoryExists(upstream_dir_resolved)) {
+            std::string home = GetEnvValue("HOME");
+            if (!home.empty()) {
+                std::string ai_upp = JoinPath(home, "Dev/ai-upp/uppsrc");
+                if (DirectoryExists(ai_upp)) upstream_dir_resolved = ai_upp;
+            }
+        }
+        if (upstream_dir_resolved.empty() || !DirectoryExists(upstream_dir_resolved)) {
+            std::cerr << "Error: Upstream ultimatepp/uppsrc directory not found. Specify with --upstream <path>\n";
+            return 1;
+        }
+        if (!bridge.AuditUpstreamPatches(upstream_dir_resolved, full_applied, full_patches, upstream_diff_pkg, verbose)) {
+            return 1;
+        }
+        return 0;
+    }
 
     // Handle --make-patches command
     if (make_patches_cmd) {

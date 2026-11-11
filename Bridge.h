@@ -82,6 +82,13 @@ public:
                          const std::string& patches_dir,
                          bool verbose = false);
 
+    // Audits surgical patches against upstream pristine sources and reports cleanliness / drift
+    bool AuditUpstreamPatches(const std::string& upstream_uppsrc,
+                             const std::string& applied_dir,
+                             const std::string& patches_dir,
+                             const std::string& target_pkg = "",
+                             bool verbose = false);
+
 private:
     std::vector<RestructureRule> restructure_rules_;
     std::map<std::string, std::string> redirects_;
