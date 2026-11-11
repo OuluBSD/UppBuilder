@@ -68,6 +68,27 @@ public:
                                   bool force = false,
                                   bool verbose = false);
 
+    // Materializes a specific upstream assembly (e.g. "uppsrc", "reference", "tutorial", "examples", "upptst", "autotest")
+    // into applied_dir with include/manifest rewriting and surgical patch application.
+    bool MaterializeAssembly(const std::string& upstream_assembly_dir,
+                            const std::string& applied_dir,
+                            const std::string& patches_dir = "",
+                            bool force = false,
+                            bool verbose = false);
+
+    // Materializes all standard upstream assemblies into base_bazaarcore_dir:
+    // uppsrc -> patched-uppsrc / applied-patches
+    // reference -> applied-reference
+    // tutorial -> applied-tutorial
+    // examples -> applied-examples
+    // upptst -> applied-upptst
+    // autotest -> applied-autotest
+    bool MaterializeAllAssemblies(const std::string& upstream_root,
+                                 const std::string& base_bazaarcore_dir,
+                                 const std::string& patches_dir = "",
+                                 bool force = false,
+                                 bool verbose = false);
+
     // Manifest & header dependency rewriter:
     // Rewrites uses CtrlCore -> Ctrl/Core, uses CtrlLib -> Ctrl/Lib in all .upp files
     // Rewrites #include <CtrlCore/ -> <Ctrl/Core/, <CtrlLib/ -> <Ctrl/Lib/ in headers and sources

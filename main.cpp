@@ -47,6 +47,8 @@ void PrintUsage(const char* prog) {
     std::cout << "  --uppgeometry <dir>           Path to UppGeometry repository (Geometry, Draw/Extensions, etc.)\n";
     std::cout << "  --apply-patches               Materialize applied-patches with restructuring & apply patches\n";
     std::cout << "  --make-patches                Reverse-diff applied-patches against upstream into patches/\n";
+    std::cout << "  materialize [all|asm]         Materialize upstream assemblies (uppsrc, reference, tutorial, examples, upptst, autotest)\n";
+    std::cout << "  --materialize-all             Materialize all upstream assemblies into applied-*/\n";
     std::cout << "  upstream-diff [pkg]           Audit surgical patches against upstream U++ repository\n";
     std::cout << "  --applied-patches <dir>       Path to applied-patches directory (default: applied-patches)\n";
     std::cout << "  --upstream <dir>              Path to pristine upstream ultimatepp/uppsrc\n";
@@ -180,6 +182,8 @@ int main(int argc, char* argv[]) {
     std::string custom_uppgeometry;
     bool apply_patches_cmd = false;
     bool make_patches_cmd = false;
+    bool materialize_cmd = false;
+    std::string materialize_target = "all";
     bool upstream_diff_cmd = false;
     std::string upstream_diff_pkg;
     std::string custom_umk;
@@ -245,6 +249,14 @@ int main(int argc, char* argv[]) {
             apply_patches_cmd = true;
         } else if (arg == "--make-patches") {
             make_patches_cmd = true;
+        } else if (arg == "materialize") {
+            materialize_cmd = true;
+            if (i + 1 < argc && argv[i + 1][0] != '-') {
+                materialize_target = argv[++i];
+            }
+        } else if (arg == "--materialize-all" || arg == "--apply-all") {
+            materialize_cmd = true;
+            materialize_target = "all";
         } else if (arg == "upstream-diff" || arg == "--upstream-diff") {
             upstream_diff_cmd = true;
             if (i + 1 < argc && argv[i + 1][0] != '-') {
@@ -762,6 +774,34 @@ int main(int argc, char* argv[]) {
         return 0;
     }
 
+    // Handle materialize command
+    if (materialize_cmd) {
+        if (upstream_dir_resolved.empty() || !DirectoryExists(upstream_dir_resolved)) {
+            std::string home = GetEnvValue("HOME");
+            if (!home.empty()) {
+                std::string ai_upp = JoinPath(home, "Dev/ai-upp/uppsrc");
+                if (DirectoryExists(ai_upp)) upstream_dir_resolved = ai_upp;
+            }
+        }
+        if (upstream_dir_resolved.empty() || !DirectoryExists(upstream_dir_resolved)) {
+            std::cerr << "Error: Upstream ultimatepp/uppsrc directory not found. Specify with --upstream <path>\n";
+            return 1;
+        }
+        std::string upstream_root = GetParentDir(upstream_dir_resolved);
+        if (materialize_target == "all") {
+            if (!bridge.MaterializeAllAssemblies(upstream_root, base_for_patches, full_patches, true, verbose)) {
+                return 1;
+            }
+        } else {
+            std::string src_asm = (materialize_target == "uppsrc") ? upstream_dir_resolved : JoinPath(upstream_root, materialize_target);
+            std::string dst_asm = (materialize_target == "uppsrc") ? full_applied : JoinPath(base_for_patches, "applied-" + materialize_target);
+            if (!bridge.MaterializeAssembly(src_asm, dst_asm, full_patches, true, verbose)) {
+                return 1;
+            }
+        }
+        return 0;
+    }
+
     // Handle --make-patches command
     if (make_patches_cmd) {
         if (upstream_dir_resolved.empty() || !DirectoryExists(upstream_dir_resolved)) {
@@ -792,6 +832,26 @@ int main(int argc, char* argv[]) {
         bridge.MaterializeAppliedPatches(upstream_dir_resolved, full_applied, full_patches, false, verbose);
     }
 
+    // Check if target package references an upstream assembly (examples/, reference/, tutorial/, upptst/, autotest/)
+    std::string extra_upstream_asm_dir;
+    size_t first_slash = target_pkg.find('/');
+    if (first_slash != std::string::npos) {
+        std::string prefix = target_pkg.substr(0, first_slash);
+        if (prefix == "examples" || prefix == "reference" || prefix == "tutorial" || prefix == "upptst" || prefix == "autotest") {
+            std::string applied_asm_name = "applied-" + prefix;
+            extra_upstream_asm_dir = JoinPath(base_for_patches, applied_asm_name);
+            if (!DirectoryExists(extra_upstream_asm_dir) && !upstream_dir_resolved.empty()) {
+                std::string upstream_root = GetParentDir(upstream_dir_resolved);
+                std::string src_asm = JoinPath(upstream_root, prefix);
+                if (DirectoryExists(src_asm)) {
+                    std::cout << "Notice: " << applied_asm_name << " assembly not found at " << extra_upstream_asm_dir << ". Materializing...\n";
+                    bridge.MaterializeAssembly(src_asm, extra_upstream_asm_dir, full_patches, false, verbose);
+                }
+            }
+            target_pkg = target_pkg.substr(first_slash + 1);
+        }
+    }
+
     // Assemble roots for umk:
     // 1. Patched upstream foundation assembly (patched Core + upstream packages)
     // 2. BazaarCore uppsrc (Core/Ext, shims, Terminal, Docking, Manager, etc.) if external
@@ -800,6 +860,9 @@ int main(int argc, char* argv[]) {
     std::vector<std::string> assembly_roots;
     if (DirectoryExists(full_applied)) {
         assembly_roots.push_back(full_applied);
+    }
+    if (!extra_upstream_asm_dir.empty() && DirectoryExists(extra_upstream_asm_dir)) {
+        assembly_roots.push_back(extra_upstream_asm_dir);
     }
     if (!bazaarcore_dir.empty() && bazaarcore_dir != repo_root) {
         std::string bz_uppsrc = JoinPath(bazaarcore_dir, "uppsrc");

@@ -640,6 +640,110 @@ bool BridgeEngine::MaterializeAppliedPatches(const std::string& upstream_uppsrc,
     return true;
 }
 
+bool BridgeEngine::MaterializeAssembly(const std::string& upstream_assembly_dir,
+                                      const std::string& applied_dir,
+                                      const std::string& patches_dir,
+                                      bool force,
+                                      bool verbose)
+{
+    if (!DirectoryExists(upstream_assembly_dir)) {
+        std::cerr << "Error: Upstream assembly directory not found: " << upstream_assembly_dir << "\n";
+        return false;
+    }
+
+    std::string assembly_name = GetFileName(upstream_assembly_dir);
+    if (assembly_name == "uppsrc") {
+        return MaterializeAppliedPatches(upstream_assembly_dir, applied_dir, patches_dir, force, verbose);
+    }
+
+    if (verbose) {
+        std::cout << "==> UppBuilder: Staging " << assembly_name << " assembly in " << applied_dir << "\n";
+    }
+    RealizeDirectory(applied_dir);
+
+    // Copy upstream packages
+    for (const auto& item : ListDir(upstream_assembly_dir)) {
+        std::string src_item = JoinPath(upstream_assembly_dir, item);
+        std::string dst_item = JoinPath(applied_dir, item);
+        if (DirectoryExists(src_item)) {
+            if (force || !DirectoryExists(dst_item)) {
+                if (DirectoryExists(dst_item)) RemoveDirectoryRecursive(dst_item);
+                CopyDirectoryRecursive(src_item, dst_item);
+            }
+        } else if (FileExists(src_item)) {
+            if (force || !FileExists(dst_item)) {
+                CopyFile(src_item, dst_item);
+            }
+        }
+    }
+
+    // Rewrite package manifests and includes across all staged packages in this assembly
+    RewriteManifestsAndIncludes(applied_dir, verbose);
+
+    // Apply surgical patches if present in patches_dir/<assembly_name> or patches_dir
+    if (!patches_dir.empty() && DirectoryExists(patches_dir)) {
+        std::string asm_patches = JoinPath(patches_dir, assembly_name);
+        std::string pdir = DirectoryExists(asm_patches) ? asm_patches : patches_dir;
+        for (const auto& item : ListDir(pdir)) {
+            if (!EndsWith(item, ".patch") && !EndsWith(item, ".diff")) continue;
+            std::string pkg_name = GetFileTitle(item);
+            std::string dst_pkg_dir = JoinPath(applied_dir, pkg_name);
+            std::string patch_path = JoinPath(pdir, item);
+            if (DirectoryExists(dst_pkg_dir) && FileExists(patch_path)) {
+                if (verbose) std::cout << "Applying patch to " << assembly_name << "/" << pkg_name << ": " << patch_path << "\n";
+                ApplySinglePatch(patch_path, dst_pkg_dir, 1, verbose);
+            }
+        }
+    }
+
+    return true;
+}
+
+bool BridgeEngine::MaterializeAllAssemblies(const std::string& upstream_root,
+                                           const std::string& base_bazaarcore_dir,
+                                           const std::string& patches_dir,
+                                           bool force,
+                                           bool verbose)
+{
+    if (!DirectoryExists(upstream_root)) {
+        std::cerr << "Error: Upstream root directory not found: " << upstream_root << "\n";
+        return false;
+    }
+
+    std::cout << "==> UppBuilder: Materializing all upstream assemblies into " << base_bazaarcore_dir << "...\n";
+
+    // 1. uppsrc -> patched-uppsrc & applied-patches
+    std::string upstream_uppsrc = JoinPath(upstream_root, "uppsrc");
+    std::string patched_uppsrc = JoinPath(base_bazaarcore_dir, "patched-uppsrc");
+    std::string applied_patches = JoinPath(base_bazaarcore_dir, "applied-patches");
+    std::string full_patches = patches_dir.empty() ? JoinPath(base_bazaarcore_dir, "patches") : patches_dir;
+
+    if (DirectoryExists(upstream_uppsrc)) {
+        std::cout << "  * Materializing assembly: uppsrc -> patched-uppsrc\n";
+        MaterializeAppliedPatches(upstream_uppsrc, patched_uppsrc, full_patches, force, verbose);
+        // Ensure applied-patches is in sync
+        if (patched_uppsrc != applied_patches) {
+            std::cout << "  * Syncing assembly: patched-uppsrc -> applied-patches\n";
+            if (DirectoryExists(applied_patches) && force) RemoveDirectoryRecursive(applied_patches);
+            if (!DirectoryExists(applied_patches)) CopyDirectoryRecursive(patched_uppsrc, applied_patches);
+        }
+    }
+
+    // 2. Other assemblies: reference, tutorial, examples, upptst, autotest
+    std::vector<std::string> assemblies = { "reference", "tutorial", "examples", "upptst", "autotest" };
+    for (const auto& asm_name : assemblies) {
+        std::string src_dir = JoinPath(upstream_root, asm_name);
+        std::string dst_dir = JoinPath(base_bazaarcore_dir, "applied-" + asm_name);
+        if (DirectoryExists(src_dir)) {
+            std::cout << "  * Materializing assembly: " << asm_name << " -> applied-" << asm_name << "\n";
+            MaterializeAssembly(src_dir, dst_dir, full_patches, force, verbose);
+        }
+    }
+
+    std::cout << "==> UppBuilder: All upstream assemblies materialized successfully!\n";
+    return true;
+}
+
 static std::string NormalizePatchHeaders(const std::string& diff_text, const std::string& upstream_dir, const std::string& staged_dir) {
     std::istringstream iss(diff_text);
     std::ostringstream oss;
