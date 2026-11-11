@@ -61,10 +61,15 @@ public:
     // 3. For packages: builds default_package with UppBuilder/umk with active profile flags
     // 4. Records installed package into VDB
     // 5. If run_tests is true: runs src_test() for emerged packages
+    // 6. If buildpkg is true: creates binary package tarball in cache
+    // 7. If usepkg is true: reuses binary package if available
     static bool Execute(const EmergePlan& plan,
                         bool update = false,
                         bool verbose = false,
-                        bool run_tests = false);
+                        bool run_tests = false,
+                        bool buildpkg = false,
+                        bool usepkg = false,
+                        bool usepkgonly = false);
 
     // Safely unmerges packages from VDB and deletes recorded artifacts
     static bool Unmerge(const std::vector<std::string>& atoms,

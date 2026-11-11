@@ -1,6 +1,7 @@
 #include "UppBuilder.h"
 #ifndef _WIN32
 #include <sys/wait.h>
+#include <sys/stat.h>
 #endif
 
 namespace UppBuilder {
@@ -238,11 +239,23 @@ bool WriteTextFile(const std::string& path, const std::string& content) {
 
 bool CopyFile(const std::string& src, const std::string& dst) {
     RealizeDirectory(GetParentDir(dst));
+#if defined(__has_include) && __has_include(<filesystem>)
+    try {
+        fs::copy_file(src, dst, fs::copy_options::overwrite_existing);
+        return true;
+    } catch (...) {}
+#endif
     std::ifstream is(src, std::ios::binary);
     if (!is) return false;
     std::ofstream os(dst, std::ios::binary);
     if (!os) return false;
     os << is.rdbuf();
+#ifndef _WIN32
+    struct stat st;
+    if (stat(src.c_str(), &st) == 0) {
+        chmod(dst.c_str(), st.st_mode);
+    }
+#endif
     return true;
 }
 

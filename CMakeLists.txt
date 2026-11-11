@@ -21,6 +21,7 @@ set(SOURCES
     OverlayManager.cpp
     EmergeEngine.cpp
     VdbManager.cpp
+    BinPkgManager.cpp
     main.cpp
 )
 
@@ -41,6 +42,7 @@ set(HEADERS
     OverlayManager.h
     EmergeEngine.h
     VdbManager.h
+    BinPkgManager.h
 )
 
 add_executable(uppbuilder ${SOURCES} ${HEADERS})

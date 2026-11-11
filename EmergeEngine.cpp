@@ -1,5 +1,6 @@
 #include "EmergeEngine.h"
 #include "VdbManager.h"
+#include "BinPkgManager.h"
 #include <functional>
 #include <sstream>
 
@@ -183,7 +184,7 @@ std::string EmergeEngine::FormatPlan(const EmergePlan& plan) {
     return ss.str();
 }
 
-bool EmergeEngine::Execute(const EmergePlan& plan, bool update, bool verbose, bool run_tests) {
+bool EmergeEngine::Execute(const EmergePlan& plan, bool update, bool verbose, bool run_tests, bool buildpkg, bool usepkg, bool usepkgonly) {
     std::cout << ">>> Emerging packages with profile '" << plan.profile_name << "'...\n";
     for (size_t i = 0; i < plan.items.size(); i++) {
         const auto& item = plan.items[i];
@@ -204,8 +205,35 @@ bool EmergeEngine::Execute(const EmergePlan& plan, bool update, bool verbose, bo
             continue;
         }
 
-        // 1. Unpack / clone / fetch git repo
         std::string repo_dir = item.resolved_repo_path;
+
+        // 0. Binary package reuse (--usepkg / --usepkgonly)
+        if (usepkg || usepkgonly) {
+            std::string binpkg_path;
+            if (BinPkgManager::HasBinPkg(item.atom, item.build_info.version, plan.profile_name, &binpkg_path)) {
+                std::cout << ">>> Found pre-compiled binary package: " << binpkg_path << "\n";
+                if (BinPkgManager::InstallBinPkg(binpkg_path, plan.profile_name, repo_dir, verbose)) {
+                    std::cout << ">>> Successfully emerged " << item.atom << " from binary package!\n";
+                    if (run_tests) {
+                        std::cout << ">>> Running tests for " << item.atom << "...\n";
+                        TestResult res;
+                        if (!ExecuteSingleTest(item.build_info, repo_dir, res, verbose)) {
+                            std::cerr << "Error: Test suite failed for " << item.atom << ": " << res.message << "\n";
+                            return false;
+                        }
+                    }
+                    continue; // Skip source compilation!
+                } else {
+                    std::cerr << "Warning: Failed to install from binary package, falling back to source build.\n";
+                    if (usepkgonly) return false;
+                }
+            } else if (usepkgonly) {
+                std::cerr << "Error: Binary package not found for " << item.atom << " and --usepkgonly was requested.\n";
+                return false;
+            }
+        }
+
+        // 1. Unpack / clone / fetch git repo
         if (!DirectoryExists(repo_dir)) {
             std::string parent = GetParentDir(repo_dir);
             RealizeDirectory(parent);
@@ -315,6 +343,12 @@ bool EmergeEngine::Execute(const EmergePlan& plan, bool update, bool verbose, bo
         VdbManager::RegisterPackage(vdb_entry);
         if (verbose) {
             std::cout << ">>> Registered " << item.atom << " in VDB database.\n";
+        }
+
+        // 3b. Create binary package if --buildpkg requested
+        if (buildpkg && !item.is_virtual) {
+            if (verbose) std::cout << ">>> Archiving binary package for " << item.atom << "...\n";
+            BinPkgManager::CreateBinPkg(item.build_info, plan.profile_name, repo_dir, item.active_use_flags, verbose);
         }
 
         // 4. Run tests if requested

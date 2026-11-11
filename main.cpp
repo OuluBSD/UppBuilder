@@ -14,6 +14,7 @@
 #include "OverlayManager.h"
 #include "EmergeEngine.h"
 #include "VdbManager.h"
+#include "BinPkgManager.h"
 
 using namespace UppBuilder;
 
@@ -76,6 +77,11 @@ void PrintUsage(const char* prog) {
     std::cout << "  --force                       Force unmerge ignoring reverse dependencies\n";
     std::cout << "  -p, --pretend                 Display merge plan without executing changes\n";
     std::cout << "  -u, --update                  Update existing repository checkouts before build\n";
+    std::cout << "  -b, --buildpkg                Build binary packages (.tar.gz) alongside source emerge\n";
+    std::cout << "  -k, --usepkg                  Use binary package if available, else compile from source\n";
+    std::cout << "  -K, --usepkgonly              Only use binary packages; fail if missing\n";
+    std::cout << "  binpkg list                   List cached binary packages for active profile\n";
+    std::cout << "  binpkg clean                  Clean cached binary packages for active profile\n";
     std::cout << "  vdb list                      List installed packages in VDB database\n";
     std::cout << "  vdb info <atom>               Show installed package details from VDB database\n";
     std::cout << "  vdb diff <p1> <p2>            Compare installed packages between two profiles\n";
@@ -157,6 +163,12 @@ int main(int argc, char* argv[]) {
 
     bool do_test = false;
     std::vector<std::string> test_atoms;
+
+    bool emerge_buildpkg = false;
+    bool emerge_usepkg = false;
+    bool emerge_usepkgonly = false;
+    bool binpkg_list = false;
+    bool binpkg_clean = false;
 
     bool do_unmerge = false;
     bool unmerge_force = false;
@@ -438,10 +450,30 @@ int main(int argc, char* argv[]) {
             emerge_pretend = true;
         } else if (arg == "-u" || arg == "--update") {
             emerge_update = true;
+        } else if (arg == "-b" || arg == "--buildpkg") {
+            emerge_buildpkg = true;
+        } else if (arg == "-k" || arg == "--usepkg") {
+            emerge_usepkg = true;
+        } else if (arg == "-K" || arg == "--usepkgonly") {
+            emerge_usepkgonly = true;
+        } else if (arg == "binpkg") {
+            if (i + 1 < argc) {
+                std::string sub = argv[++i];
+                if (sub == "list") {
+                    binpkg_list = true;
+                } else if (sub == "clean") {
+                    binpkg_clean = true;
+                }
+            } else {
+                binpkg_list = true;
+            }
         } else if (arg == "-a" || arg == "--add-root") {
             if (i + 1 < argc) extra_roots.push_back(argv[++i]);
         } else if (arg[0] != '-') {
-            target_pkg = arg;
+            if (do_emerge) emerge_atoms.push_back(arg);
+            else if (do_test) test_atoms.push_back(arg);
+            else if (do_unmerge) unmerge_atoms.push_back(arg);
+            else target_pkg = arg;
         }
     }
 
@@ -658,9 +690,39 @@ int main(int argc, char* argv[]) {
         if (emerge_pretend) {
             return 0;
         }
-        if (!EmergeEngine::Execute(plan, emerge_update, verbose, emerge_test)) {
+        if (!EmergeEngine::Execute(plan, emerge_update, verbose, emerge_test, emerge_buildpkg, emerge_usepkg, emerge_usepkgonly)) {
             return 1;
         }
+        return 0;
+    }
+
+    if (binpkg_list) {
+        std::string prof = selected_profile.empty() ? ProfileManager::GetActiveProfileName() : selected_profile;
+        auto list = BinPkgManager::ListBinPkgs(prof);
+        std::cout << "Cached Binary Packages [" << prof << "] (" << list.size() << "):\n\n";
+        if (list.empty()) {
+            std::cout << "  (no binary packages cached)\n";
+        } else {
+            std::cout << std::left << std::setw(32) << "ATOM"
+                      << std::setw(12) << "VERSION"
+                      << std::setw(12) << "SIZE"
+                      << "PATH\n";
+            std::cout << std::string(75, '-') << "\n";
+            for (const auto& item : list) {
+                std::string size_str = std::to_string(item.file_size / 1024) + " KB";
+                std::cout << std::left << std::setw(32) << item.atom
+                          << std::setw(12) << item.version
+                          << std::setw(12) << size_str
+                          << item.path << "\n";
+            }
+        }
+        return 0;
+    }
+
+    if (binpkg_clean) {
+        std::string prof = selected_profile.empty() ? ProfileManager::GetActiveProfileName() : selected_profile;
+        BinPkgManager::CleanBinPkgs(prof, verbose);
+        std::cout << ">>> Cleaned binary package cache for profile [" << prof << "].\n";
         return 0;
     }
 
