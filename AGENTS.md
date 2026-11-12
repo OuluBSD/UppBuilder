@@ -69,6 +69,8 @@ When building a package from any workspace, `UppBuilder` auto-resolves sibling r
 5. **Target Repository**: Local roots (`uppsrc`, `upptst`, `src`, `.`).
 6. **Command-Line Overrides**: `--add-root <dir>` / `-a <dir>`.
 
+`--uppsrc-dir <path>` overrides the first assembly root (and patched-root discovery) without changing the `--upstream` source used for patch materialization.
+
 ---
 
 ## 🛠️ Common Recipes & Commands

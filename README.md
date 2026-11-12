@@ -75,6 +75,17 @@ Applies unified diffs to the staged workspace with automatic conflict detection 
 ./uppbuilder --patch patches/0001-upphub-multi-root.patch <target>
 ```
 
+### Select the U++ Assembly Root
+By default, UppBuilder discovers `patched-uppsrc`. Select pristine upstream or another assembly explicitly with `--uppsrc-dir`; this path becomes the first package-search root and is never used as a patch output directory:
+```bash
+# Build against pristine upstream Core, then the normal BazaarCore package roots
+./uppbuilder --uppsrc-dir /home/sblo/Dev/ultimatepp/uppsrc Manager --bazaarcore /home/sblo/OuluBSD/BazaarCore
+
+# Explicitly select BazaarCore's patched assembly
+./uppbuilder --uppsrc-dir /home/sblo/OuluBSD/BazaarCore/patched-uppsrc Manager --bazaarcore /home/sblo/OuluBSD/BazaarCore
+```
+`--uppsrc-dir` overrides `UPP_PATCHED_UPPSRC` and automatic patched-root discovery. `--upstream` remains separate: it selects the source used by patch materialization.
+
 ---
 
 ## 🔍 Inspection & Dependency Tools
@@ -208,6 +219,7 @@ Build Options:
   --static                      Force static library linking
   -o, --output <path>           Custom output binary path
   --copy-deps                   Copy non-system runtime libraries next to binary
+  --uppsrc-dir <dir>            Select the first U++ assembly root
   -v, --verbose                 Verbose diagnostics and commands
 
 3-Pillar Bridge Options:

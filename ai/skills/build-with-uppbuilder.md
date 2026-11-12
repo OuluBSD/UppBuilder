@@ -56,7 +56,7 @@ uppbuilder TargetPackage -v
 
 ### 2. Multi-Assembly Resolution
 `uppbuilder` automatically constructs the multi-assembly search tree. When run from any repository, it scans and chains roots in the following priority:
-1. `BazaarCore/patched-uppsrc` (patched upstream Core and foundation)
+1. Explicit `--uppsrc-dir <path>` if supplied; otherwise `BazaarCore/patched-uppsrc` (patched upstream Core and foundation)
 2. `BazaarCore/uppsrc` (modular packages: `Core/Ext`, `Docking`, `Terminal`, `Manager`, `VirtualGui`)
 3. `SuperIntelligence/uppsrc` or `SuperIntelligence` (AI and agent infrastructure: `SweAgent`)
 4. `CommandCenter/uppsrc` or `CommandCenter` (DropTerm and terminal multiplexing)
@@ -64,6 +64,13 @@ uppbuilder TargetPackage -v
 6. Explicit extra roots passed via `-a <path>` / `--add-root <path>`
 
 No manual nest configuration in TheIDE or `umk` is required.
+
+Use `--uppsrc-dir` to compare against pristine upstream or explicitly select another assembly. It takes precedence over `UPP_PATCHED_UPPSRC` and patched-root discovery, and is never used as a patch-materialization destination:
+```bash
+uppbuilder TargetPackage --uppsrc-dir /path/to/ultimatepp/uppsrc --bazaarcore /path/to/BazaarCore
+uppbuilder TargetPackage --uppsrc-dir /path/to/BazaarCore/patched-uppsrc --bazaarcore /path/to/BazaarCore
+```
+Keep `--upstream <path>` for the source consumed by `--apply-patches`/`--make-patches`.
 
 ---
 

@@ -53,6 +53,7 @@ void PrintUsage(const char* prog) {
     std::cout << "  --materialize-all             Materialize all upstream assemblies into applied-*/\n";
     std::cout << "  upstream-diff [pkg]           Audit surgical patches against upstream U++ repository\n";
     std::cout << "  --applied-patches <dir>       Path to applied-patches directory (default: applied-patches)\n";
+    std::cout << "  --uppsrc-dir <dir>            Select first U++ assembly root (overrides patched-root discovery)\n";
     std::cout << "  --upstream <dir>              Path to pristine upstream ultimatepp/uppsrc\n";
     std::cout << "  --patches-dir <dir>           Path to patches directory (default: patches)\n\n";
     std::cout << "Inspection & Graph Analysis:\n";
@@ -195,6 +196,7 @@ int main(int argc, char* argv[]) {
     std::string staging_dir = ".uppbuilder/staging";
     std::string applied_patches_dir;
     std::string patches_dir = "patches";
+    std::string custom_uppsrc_dir;
     std::string upstream_dir;
     std::string custom_bazaarcore;
     std::string custom_superintelligence;
@@ -250,6 +252,16 @@ int main(int argc, char* argv[]) {
             staging_dir = argv[++i];
         } else if ((arg == "--applied-patches" || arg == "--patched-dir") && i + 1 < argc) {
             applied_patches_dir = argv[++i];
+        } else if (arg == "--uppsrc-dir") {
+            if (i + 1 >= argc || argv[i + 1][0] == '-') {
+                std::cerr << "Error: --uppsrc-dir requires an existing assembly directory.\n";
+                return 1;
+            }
+            custom_uppsrc_dir = argv[++i];
+            if (custom_uppsrc_dir.empty()) {
+                std::cerr << "Error: --uppsrc-dir requires a non-empty path.\n";
+                return 1;
+            }
         } else if (arg == "--patches-dir" && i + 1 < argc) {
             patches_dir = argv[++i];
         } else if (arg == "--upstream" && i + 1 < argc) {
@@ -851,6 +863,14 @@ int main(int argc, char* argv[]) {
 
     std::string upstream_dir_resolved = ResolveUpstreamPath(upstream_dir, base_for_patches);
     std::string full_applied = ResolvePatchedUppsrcPath(applied_patches_dir, base_for_patches);
+    std::string selected_uppsrc_dir;
+    if (!custom_uppsrc_dir.empty()) {
+        selected_uppsrc_dir = NormalizePath(custom_uppsrc_dir);
+        if (!DirectoryExists(selected_uppsrc_dir)) {
+            std::cerr << "Error: U++ assembly directory not found: " << selected_uppsrc_dir << "\n";
+            return 1;
+        }
+    }
     std::string full_patches = (StartsWith(patches_dir, "/") || (patches_dir.size() >= 2 && patches_dir[1] == ':')) ?
                                patches_dir : JoinPath(base_for_patches, patches_dir);
 
@@ -926,7 +946,7 @@ int main(int argc, char* argv[]) {
     }
 
     // Auto-materialize patched-uppsrc if missing and upstream is available
-    if (!DirectoryExists(full_applied) && !upstream_dir_resolved.empty()) {
+    if (custom_uppsrc_dir.empty() && !DirectoryExists(full_applied) && !upstream_dir_resolved.empty()) {
         if (verbose) std::cout << "Notice: patched assembly not found at " << full_applied << ". Materializing...\n";
         bridge.MaterializeAppliedPatches(upstream_dir_resolved, full_applied, full_patches, false, verbose);
     }
@@ -952,13 +972,14 @@ int main(int argc, char* argv[]) {
     }
 
     // Assemble roots for umk:
-    // 1. Patched upstream foundation assembly (patched Core + upstream packages)
+    // 1. Explicit U++ assembly root, or discovered patched foundation assembly
     // 2. BazaarCore uppsrc (Core/Ext, shims, Terminal, Docking, Manager, etc.) if external
     // 3. Current repository roots (uppsrc, upptst, src, root)
     // 4. Any extra roots passed via -a / --add-root
     std::vector<std::string> assembly_roots;
-    if (DirectoryExists(full_applied)) {
-        assembly_roots.push_back(full_applied);
+    const std::string& primary_uppsrc = custom_uppsrc_dir.empty() ? full_applied : selected_uppsrc_dir;
+    if (DirectoryExists(primary_uppsrc)) {
+        assembly_roots.push_back(primary_uppsrc);
     }
     if (!extra_upstream_asm_dir.empty() && DirectoryExists(extra_upstream_asm_dir)) {
         assembly_roots.push_back(extra_upstream_asm_dir);
