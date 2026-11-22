@@ -582,7 +582,6 @@ bool EmergeEngine::RunTests(const std::vector<std::string>& atoms,
         std::string home = GetEnvValue("HOME");
         if (!home.empty()) {
             if (DirectoryExists(JoinPath(home, "OuluBSD/BazaarCore"))) bc = JoinPath(home, "OuluBSD/BazaarCore");
-            else if (DirectoryExists(JoinPath(home, "Dev/BazaarCore"))) bc = JoinPath(home, "Dev/BazaarCore");
         }
     }
 

@@ -516,11 +516,10 @@ std::string ResolveUpstreamPath(const std::string& cli_override, const std::stri
 
     // Auto-detect common candidate paths
     std::vector<std::string> candidates = {
+        JoinPath(GetEnvValue("HOME"), "upp/ultimatepp/uppsrc"),
+        JoinPath(GetEnvValue("HOME"), "OuluBSD/ultimatepp/uppsrc"),
         JoinPath(GetParentDir(repo_root), "ultimatepp/uppsrc"),
-        JoinPath(repo_root, "../ultimatepp/uppsrc"),
-        JoinPath(GetEnvValue("HOME"), "Dev/ultimatepp/uppsrc"),
-        "/yhteinen/active/sblo/Dev/ultimatepp/uppsrc",
-        "/home/sblo/Dev/ultimatepp/uppsrc"
+        JoinPath(repo_root, "../ultimatepp/uppsrc")
     };
     for (const auto& c : candidates) {
         if (!c.empty() && DirectoryExists(c)) {

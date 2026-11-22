@@ -879,7 +879,7 @@ int main(int argc, char* argv[]) {
         if (upstream_dir_resolved.empty() || !DirectoryExists(upstream_dir_resolved)) {
             std::string home = GetEnvValue("HOME");
             if (!home.empty()) {
-                std::string ai_upp = JoinPath(home, "Dev/ai-upp/uppsrc");
+                std::string ai_upp = JoinPath(home, "upp/uppsrc");
                 if (DirectoryExists(ai_upp)) upstream_dir_resolved = ai_upp;
             }
         }
@@ -898,7 +898,7 @@ int main(int argc, char* argv[]) {
         if (upstream_dir_resolved.empty() || !DirectoryExists(upstream_dir_resolved)) {
             std::string home = GetEnvValue("HOME");
             if (!home.empty()) {
-                std::string ai_upp = JoinPath(home, "Dev/ai-upp/uppsrc");
+                std::string ai_upp = JoinPath(home, "upp/uppsrc");
                 if (DirectoryExists(ai_upp)) upstream_dir_resolved = ai_upp;
             }
         }
