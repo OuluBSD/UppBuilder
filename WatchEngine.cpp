@@ -198,12 +198,15 @@ std::map<std::string, FileSnapshot> WatchEngine::Snapshot(const std::vector<std:
             if (valid_exts.find(ext) == valid_exts.end()) continue;
 
 #ifdef _WIN32
-            struct _stat st;
-            if (_stat(f.c_str(), &st) == 0) {
+            // std::filesystem: works the same on MSVC and mingw (the CRT stat types differ between them)
+            std::error_code ec_size, ec_time;
+            auto fsize = fs::file_size(f, ec_size);
+            auto ftime = fs::last_write_time(f, ec_time);
+            if (!ec_size && !ec_time) {
                 FileSnapshot snap;
                 snap.path = f;
-                snap.mtime = (uint64_t)st.st_mtime;
-                snap.size = (uint64_t)st.st_size;
+                snap.mtime = (uint64_t)ftime.time_since_epoch().count();
+                snap.size = (uint64_t)fsize;
                 res[f] = snap;
             }
 #else
