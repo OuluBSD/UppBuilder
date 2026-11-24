@@ -40,11 +40,11 @@ UppBootstrap  -->  UppBuilder  -->  BazaarCore  -->  Downstream Repos
 
 | Component | Files | Description & Responsibilities |
 |-----------|-------|--------------------------------|
-| **CLI & Dispatch** | [`main.cpp`](file:///home/sblo/Dev/UppBuilder/main.cpp) | Argument parsing, sibling repo auto-discovery, assembly root ordering, exit code orchestration. |
-| **Manifest Parser** | [`UppParser.h`](file:///home/sblo/Dev/UppBuilder/UppParser.h), [`UppParser.cpp`](file:///home/sblo/Dev/UppBuilder/UppParser.cpp) | Parses `.upp` packages, extracts flags, files, mainconfigs, and evaluates conditional `uses(FLAG)`. |
-| **3-Pillar Bridge** | [`Bridge.h`](file:///home/sblo/Dev/UppBuilder/Bridge.h), [`Bridge.cpp`](file:///home/sblo/Dev/UppBuilder/Bridge.cpp) | Implements Package Redirection (`redirects.json`), File Overlays (`overlays.json`), and Surgical Patches (`patches/`). Materializes `patched-uppsrc` and staging workspaces. |
-| **Dependency Graph**| [`DepGraph.h`](file:///home/sblo/Dev/UppBuilder/DepGraph.h), [`DepGraph.cpp`](file:///home/sblo/Dev/UppBuilder/DepGraph.cpp) | Builds active package dependency DAGs, detects cycles, topological sorts, and exports to Mermaid, Graphviz DOT, or JSON. |
-| **Header Coupling** | [`HeaderScanner.h`](file:///home/sblo/Dev/UppBuilder/HeaderScanner.h), [`HeaderScanner.cpp`](file:///home/sblo/Dev/UppBuilder/HeaderScanner.cpp) | Scans `#include` directives across assemblies, maps headers to packages, identifies undeclared dependencies, and generates coupling markdown reports. |
+| **CLI & Dispatch** | [`main.cpp`](main.cpp) | Argument parsing, sibling repo auto-discovery, assembly root ordering, exit code orchestration. |
+| **Manifest Parser** | [`UppParser.h`](UppParser.h), [`UppParser.cpp`](UppParser.cpp) | Parses `.upp` packages, extracts flags, files, mainconfigs, and evaluates conditional `uses(FLAG)`. |
+| **3-Pillar Bridge** | [`Bridge.h`](Bridge.h), [`Bridge.cpp`](Bridge.cpp) | Implements Package Redirection (`redirects.json`), File Overlays (`overlays.json`), and Surgical Patches (`patches/`). Materializes `patched-uppsrc` and staging workspaces. |
+| **Dependency Graph**| [`DepGraph.h`](DepGraph.h), [`DepGraph.cpp`](DepGraph.cpp) | Builds active package dependency DAGs, detects cycles, topological sorts, and exports to Mermaid, Graphviz DOT, or JSON. |
+| **Header Coupling** | [`HeaderScanner.h`](HeaderScanner.h), [`HeaderScanner.cpp`](HeaderScanner.cpp) | Scans `#include` directives across assemblies, maps headers to packages, identifies undeclared dependencies, and generates coupling markdown reports. |
 | **Flag Auditor** | [`FlagAuditor.h`](file:///home/sblo/OuluBSD/UppBuilder/FlagAuditor.h), [`FlagAuditor.cpp`](file:///home/sblo/OuluBSD/UppBuilder/FlagAuditor.cpp) | Portage-style package flag auditor: scans code flags (`flagFLAG`), compares against `.upp` `acceptflags`, identifies unaccepted code flags, and generates patches. |
 | **USE Model** | [`UseModel.h`](file:///home/sblo/OuluBSD/UppBuilder/UseModel.h), [`UseModel.cpp`](file:///home/sblo/OuluBSD/UppBuilder/UseModel.cpp) | Semantic USE flags, scopes (`global`, `accepted`, `main_only`), transitions, conflict detection, and compilation flag projection. |
 | **Policy Engine** | [`PolicyEngine.h`](file:///home/sblo/OuluBSD/UppBuilder/PolicyEngine.h), [`PolicyEngine.cpp`](file:///home/sblo/OuluBSD/UppBuilder/PolicyEngine.cpp) | Portage-style `.uppbuilder/` hierarchy parser (`make.conf`, `package.use`, `package.mask`, `package.force`). |
@@ -52,9 +52,9 @@ UppBootstrap  -->  UppBuilder  -->  BazaarCore  -->  Downstream Repos
 | **Profile Manager** | [`ProfileManager.h`](file:///home/sblo/OuluBSD/UppBuilder/ProfileManager.h), [`ProfileManager.cpp`](file:///home/sblo/OuluBSD/UppBuilder/ProfileManager.cpp) | Target profile resolution (`NativeClang`, `NativeGcc`, `MsvcX64`, `WasmBrowser`), profile inheritance, and shared global build cache resolution (`~/.cache/upp.out`, `%LOCALAPPDATA%/u++/out`). |
 | **Provider Planner** | [`ProviderPlanner.h`](file:///home/sblo/OuluBSD/UppBuilder/ProviderPlanner.h), [`ProviderPlanner.cpp`](file:///home/sblo/OuluBSD/UppBuilder/ProviderPlanner.cpp) | Cross-platform capability resolver for `Virtual/*` dependencies (`vcpkg`, `apt-get`, `brew`, `plugin/*`). |
 | **Overlay Manager** | [`OverlayManager.h`](file:///home/sblo/OuluBSD/UppBuilder/OverlayManager.h), [`OverlayManager.cpp`](file:///home/sblo/OuluBSD/UppBuilder/OverlayManager.cpp) | Portage-style overlay discovery, package traversal across CapitalCase categories, package search, and git overlay synchronization. |
-| **Umk Driver** | [`UmkDriver.h`](file:///home/sblo/Dev/UppBuilder/UmkDriver.h), [`UmkDriver.cpp`](file:///home/sblo/Dev/UppBuilder/UmkDriver.cpp) | Discovers `umk`, scans `~/.config/u++/theide/*.bm` build methods, generates canonical config keys, and executes compilation jobs. |
-| **Runtime Harvester**| [`RuntimeDeps.h`](file:///home/sblo/Dev/UppBuilder/RuntimeDeps.h), [`RuntimeDeps.cpp`](file:///home/sblo/Dev/UppBuilder/RuntimeDeps.cpp) | Recursively scans ELF `DT_NEEDED`, PE import tables, or Mach-O `LC_LOAD_DYLIB` to bundle dynamic dependencies with `--copy-deps`. |
-| **Shared Utilities**| [`UppBuilder.h`](file:///home/sblo/Dev/UppBuilder/UppBuilder.h), [`UppBuilder.cpp`](file:///home/sblo/Dev/UppBuilder/UppBuilder.cpp) | Cross-platform filesystem helpers, string processing, child process spawning, and entrypoint creation. |
+| **Umk Driver** | [`UmkDriver.h`](UmkDriver.h), [`UmkDriver.cpp`](UmkDriver.cpp) | Discovers `umk`, scans `~/.config/u++/theide/*.bm` build methods, generates canonical config keys, and executes compilation jobs. |
+| **Runtime Harvester**| [`RuntimeDeps.h`](RuntimeDeps.h), [`RuntimeDeps.cpp`](RuntimeDeps.cpp) | Recursively scans ELF `DT_NEEDED`, PE import tables, or Mach-O `LC_LOAD_DYLIB` to bundle dynamic dependencies with `--copy-deps`. |
+| **Shared Utilities**| [`UppBuilder.h`](UppBuilder.h), [`UppBuilder.cpp`](UppBuilder.cpp) | Cross-platform filesystem helpers, string processing, child process spawning, and entrypoint creation. |
 
 ---
 
@@ -122,10 +122,10 @@ uppbuilder TargetPackage --use "+sqlite +virtualgui"
 ### 4. Assembly Patching & Materialization
 ```bash
 # Materialize patched-uppsrc from pristine upstream ultimatepp + patches:
-uppbuilder --apply-patches --upstream ../ultimatepp/uppsrc --applied-patches ../BazaarCore/patched-uppsrc -v
+uppbuilder --apply-patches --upstream ~/upp/uppsrc --applied-patches ../BazaarCore/patched-uppsrc -v
 
 # Reverse-diff modified packages into surgical patch files:
-uppbuilder --make-patches --upstream ../ultimatepp/uppsrc --applied-patches ../BazaarCore/patched-uppsrc
+uppbuilder --make-patches --upstream ~/upp/uppsrc --applied-patches ../BazaarCore/patched-uppsrc
 ```
 
 ### 5. Target Profiles & UppOverlay Catalog

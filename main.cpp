@@ -884,7 +884,7 @@ int main(int argc, char* argv[]) {
             }
         }
         if (upstream_dir_resolved.empty() || !DirectoryExists(upstream_dir_resolved)) {
-            std::cerr << "Error: Upstream ultimatepp/uppsrc directory not found. Specify with --upstream <path>\n";
+            std::cerr << "Error: Upstream U++ uppsrc not found (expected ~/upp/uppsrc). Specify with --upstream <path>\n";
             return 1;
         }
         if (!bridge.AuditUpstreamPatches(upstream_dir_resolved, full_applied, full_patches, upstream_diff_pkg, verbose)) {
@@ -903,7 +903,7 @@ int main(int argc, char* argv[]) {
             }
         }
         if (upstream_dir_resolved.empty() || !DirectoryExists(upstream_dir_resolved)) {
-            std::cerr << "Error: Upstream ultimatepp/uppsrc directory not found. Specify with --upstream <path>\n";
+            std::cerr << "Error: Upstream U++ uppsrc not found (expected ~/upp/uppsrc). Specify with --upstream <path>\n";
             return 1;
         }
         std::string upstream_root = GetParentDir(upstream_dir_resolved);
@@ -924,7 +924,7 @@ int main(int argc, char* argv[]) {
     // Handle --make-patches command
     if (make_patches_cmd) {
         if (upstream_dir_resolved.empty() || !DirectoryExists(upstream_dir_resolved)) {
-            std::cerr << "Error: Upstream ultimatepp/uppsrc directory not found. Specify with --upstream <path>\n";
+            std::cerr << "Error: Upstream U++ uppsrc not found (expected ~/upp/uppsrc). Specify with --upstream <path>\n";
             return 1;
         }
         if (!bridge.GeneratePatches(upstream_dir_resolved, full_applied, full_patches, verbose)) {
@@ -936,7 +936,7 @@ int main(int argc, char* argv[]) {
     // Handle --apply-patches command
     if (apply_patches_cmd) {
         if (upstream_dir_resolved.empty() || !DirectoryExists(upstream_dir_resolved)) {
-            std::cerr << "Error: Upstream ultimatepp/uppsrc directory not found. Specify with --upstream <path>\n";
+            std::cerr << "Error: Upstream U++ uppsrc not found (expected ~/upp/uppsrc). Specify with --upstream <path>\n";
             return 1;
         }
         if (!bridge.MaterializeAppliedPatches(upstream_dir_resolved, full_applied, full_patches, true, verbose)) {

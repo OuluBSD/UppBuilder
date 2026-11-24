@@ -12,7 +12,7 @@ This skill guides AI agents and developers on building U++ packages and assembli
 
 `uppbuilder` is available at:
 - `~/bin/uppbuilder` (recommended standard path)
-- `/home/sblo/Dev/UppBuilder/uppbuilder` (or `bin/uppbuilder` within the `UppBuilder` repository)
+- `~/OuluBSD/UppBuilder/uppbuilder` (or `bin/uppbuilder` within the `UppBuilder` repository)
 - Globally on system `PATH` if configured.
 
 If `uppbuilder` is missing on a fresh system, bootstrap it with zero external dependencies:
@@ -67,7 +67,7 @@ No manual nest configuration in TheIDE or `umk` is required.
 
 Use `--uppsrc-dir` to compare against pristine upstream or explicitly select another assembly. It takes precedence over `UPP_PATCHED_UPPSRC` and patched-root discovery, and is never used as a patch-materialization destination:
 ```bash
-uppbuilder TargetPackage --uppsrc-dir /path/to/ultimatepp/uppsrc --bazaarcore /path/to/BazaarCore
+uppbuilder TargetPackage --uppsrc-dir ~/upp/uppsrc --bazaarcore /path/to/BazaarCore
 uppbuilder TargetPackage --uppsrc-dir /path/to/BazaarCore/patched-uppsrc --bazaarcore /path/to/BazaarCore
 ```
 Keep `--upstream <path>` for the source consumed by `--apply-patches`/`--make-patches`.
@@ -151,7 +151,7 @@ Materializes `patched-uppsrc` from pristine `ultimatepp/uppsrc` and applies all 
 ```bash
 cd /path/to/BazaarCore
 uppbuilder --apply-patches \
-  --upstream /path/to/ultimatepp/uppsrc \
+  --upstream ~/upp/uppsrc \
   --applied-patches /path/to/BazaarCore/patched-uppsrc \
   -v
 ```
@@ -161,7 +161,7 @@ Reverse-diffs modifications made in `patched-uppsrc` back into unified diffs ins
 ```bash
 cd /path/to/BazaarCore
 uppbuilder --make-patches \
-  --upstream /path/to/ultimatepp/uppsrc \
+  --upstream ~/upp/uppsrc \
   --applied-patches /path/to/BazaarCore/patched-uppsrc
 ```
 

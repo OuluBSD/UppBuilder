@@ -79,7 +79,7 @@ Applies unified diffs to the staged workspace with automatic conflict detection 
 By default, UppBuilder discovers `patched-uppsrc`. Select pristine upstream or another assembly explicitly with `--uppsrc-dir`; this path becomes the first package-search root and is never used as a patch output directory:
 ```bash
 # Build against pristine upstream Core, then the normal BazaarCore package roots
-./bin/UppBuilder --uppsrc-dir /home/sblo/Dev/ultimatepp/uppsrc Manager --bazaarcore /home/sblo/OuluBSD/BazaarCore
+./bin/UppBuilder --uppsrc-dir ~/upp/uppsrc Manager --bazaarcore /home/sblo/OuluBSD/BazaarCore
 
 # Explicitly select BazaarCore's patched assembly
 ./bin/UppBuilder --uppsrc-dir /home/sblo/OuluBSD/BazaarCore/patched-uppsrc Manager --bazaarcore /home/sblo/OuluBSD/BazaarCore

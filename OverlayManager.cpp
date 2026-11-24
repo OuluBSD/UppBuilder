@@ -19,7 +19,6 @@ std::string OverlayManager::FindOverlayRoot(const std::string& hint) {
     std::string home = GetEnvValue("HOME");
     if (!home.empty()) {
         candidates.push_back(JoinPath(JoinPath(home, "OuluBSD"), "UppOverlay"));
-        candidates.push_back(JoinPath(JoinPath(home, "Dev"), "UppOverlay"));
     }
 
     for (const auto& c : candidates) {

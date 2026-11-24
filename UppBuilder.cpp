@@ -418,7 +418,6 @@ std::string ResolveBazaarCorePath(const std::string& cli_override, const std::st
     };
     if (!home.empty()) {
         candidates.push_back(JoinPath(JoinPath(home, "OuluBSD"), "BazaarCore"));
-        candidates.push_back(JoinPath(JoinPath(home, "Dev"), "BazaarCore"));
     }
     for (const auto& c : candidates) {
         if (DirectoryExists(c) && DirectoryExists(JoinPath(c, "uppsrc"))) {
@@ -455,7 +454,7 @@ std::string ResolveSiblingRepoPath(const std::string& repo_name, const std::stri
     if (!home.empty()) {
         candidates.push_back(JoinPath(JoinPath(home, "OuluBSD"), repo_name));
         candidates.push_back(JoinPath(JoinPath(home, "OuluLinux"), repo_name));
-        candidates.push_back(JoinPath(JoinPath(home, "Dev"), repo_name));
+        candidates.push_back(JoinPath(JoinPath(home, "SeppoPakonen"), repo_name));
     }
     for (const auto& c : candidates) {
         if (DirectoryExists(c)) {
@@ -515,12 +514,12 @@ std::string ResolveUpstreamPath(const std::string& cli_override, const std::stri
     }
 
     // Auto-detect common candidate paths
-    std::vector<std::string> candidates = {
-        JoinPath(GetEnvValue("HOME"), "upp/ultimatepp/uppsrc"),
-        JoinPath(GetEnvValue("HOME"), "OuluBSD/ultimatepp/uppsrc"),
-        JoinPath(GetParentDir(repo_root), "ultimatepp/uppsrc"),
-        JoinPath(repo_root, "../ultimatepp/uppsrc")
-    };
+    // Canonical location on every OS: ~/upp/uppsrc (USERPROFILE on Windows).
+    (void)repo_root;
+    std::string home = GetEnvValue("HOME");
+    if (home.empty()) home = GetEnvValue("USERPROFILE");
+    std::vector<std::string> candidates;
+    if (!home.empty()) candidates.push_back(JoinPath(home, "upp/uppsrc"));
     for (const auto& c : candidates) {
         if (!c.empty() && DirectoryExists(c)) {
             return NormalizePath(c);
