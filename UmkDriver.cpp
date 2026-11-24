@@ -343,6 +343,10 @@ int UmkDriver::ExecuteBuild(const std::string& umk_exe,
             if (fl == "z.lib" || fl == "zd.lib" || fl == "zlib.lib" || fl == "zlibd.lib") {
                 std::string zs_lib = JoinPath(dir, "zs.lib");
                 if (!FileExists(zs_lib)) CopyFile(src, zs_lib);
+                // Upstream Core.upp now links libzs.lib for MSVC static builds.
+                std::string libzs_lib = JoinPath(dir, "libzs.lib");
+                if (!FileExists(libzs_lib)) CopyFile(src, libzs_lib);
+                if (!FileExists("libzs.lib")) CopyFile(src, "libzs.lib");
                 std::string z_lib = JoinPath(dir, "z.lib");
                 if (!FileExists(z_lib)) CopyFile(src, z_lib);
                 if (!FileExists("zs.lib")) CopyFile(src, "zs.lib");
