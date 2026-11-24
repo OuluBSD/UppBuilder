@@ -337,11 +337,19 @@ bool BridgeEngine::ApplySinglePatch(const std::string& patch_path, const std::st
 
     std::stringstream cmd;
     // 1. Try git apply (atomic and CRLF-resilient with --ignore-whitespace) from inside target_dir
-    cmd << "cd \"" << target_dir << "\" && git apply --ignore-whitespace --unsafe-paths --whitespace=nowarn -p" << strip << " \"" << patch_path << "\" > " << dev_null << " 2>&1";
+    // Capture git's diagnostics so a failure is explainable in verbose mode.
+    const std::string git_log = JoinPath(target_dir, ".uppbuilder-git-apply.log");
+    cmd << "cd \"" << target_dir << "\" && git apply --ignore-whitespace --unsafe-paths --whitespace=nowarn -p" << strip << " \"" << patch_path << "\" > \"" << git_log << "\" 2>&1";
     if (RunCommand(cmd.str()) == 0) {
+        std::remove(git_log.c_str());
         if (verbose) std::cout << "Successfully applied patch " << patch_path << " via git apply (cd)\n";
         return true;
     }
+    if (verbose) {
+        std::string why = ReadTextFile(git_log);
+        std::cerr << "git apply (cd) failed for " << patch_path << " in " << target_dir << ":\n" << why << "\n";
+    }
+    std::remove(git_log.c_str());
 
     // 2. Try git apply with --directory
     cmd.str("");
